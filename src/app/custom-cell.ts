@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { ICellRendererAngularComp } from 'ag-grid-angular';
+
 
 @Component({
   selector: 'app-custom-cell',
@@ -8,7 +8,7 @@ import { ICellRendererAngularComp } from 'ag-grid-angular';
     <button (click)="onClick()">Click</button>
   `,
 })
-export class CustomCellComponent implements ICellRendererAngularComp {
+export class CustomCellComponent  {
   public params: any;
 
   agInit(params: any): void {
