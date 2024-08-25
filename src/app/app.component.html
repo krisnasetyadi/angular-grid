@@ -1,44 +1,49 @@
+<div style="width: 100%; display: flex; justify-content: center">
+  <div>
+    <table style="width: 500px" onmouseleave="onmouseleave()">
+      <tr *ngFor="let row of tableData; let rowIndex = index">
+        <ng-container *ngFor="let field of row; let colIndex = index">
+          <td
+            *ngIf="field.visibility"
+            [attr.rowspan]="getSpan(field).row"
+            [attr.colspan]="getSpan(field).col"
+            [class.selected]="isCellSelected(rowIndex, colIndex)"
+            (mousedown)="startSelecting(rowIndex, colIndex)"
+            (mouseup)="endSelecting(rowIndex, colIndex)"
+            (mouseover)="updateSelection(rowIndex, colIndex)"
+            (click)="handleCellClick(field)"
+          >
+            <!-- <p>{{ rowIndex }}, {{ colIndex }}</p> -->
+            <span style="user-select: none">{{
+              field.cell?.name || "empty"
+            }}</span>
+          </td>
+        </ng-container>
+      </tr>
+    </table>
 
-<div style="width: 100%; display: flex; justify-content: center; ">
-<div >
-  <table  style="width: 500px;">
-    <tr *ngFor="let row of tableData; let rowIndex = index" >
-      <ng-container    
-        *ngFor="let field of row; let colIndex = index" 
-      >
-        <td 
-          *ngIf="field.visibility"
-          [attr.rowspan]="getSpan(field).row"
-          [attr.colspan]="getSpan(field).col"
-          [class.selected]="isCellSelected(rowIndex, colIndex)"
-          (mousedown)="startSelecting(rowIndex, colIndex)"
-          (mouseup)="endSelecting(rowIndex, colIndex)"
-          (mouseover)="updateSelection(rowIndex, colIndex)"
-          (click)="handleCellClick(field)"
-        >
-          {{field.cell?.name || 'empty'}}
-        </td>
-      </ng-container>
-    </tr>
-  </table>
-
-  <div >
-    <button (click)="mergeCells()">Merge</button>
-    <button (click)="undoMergeCells()">Undo Merge</button>
-    <button (click)="generateMatrix()">Reset </button>
+    <div style="margin-top: 10px">
+      <button style="user-select: none" (click)="mergeCells()">Merge</button>
+      <button style="user-select: none" (click)="undoMergeCells()">
+        Undo Merge
+      </button>
+      <button style="user-select: none" (click)="generateTable()">Reset</button>
+    </div>
   </div>
 </div>
- 
-</div>
-
-
-<div>
-  <span>startRange: {{ startRange | json}}</span>
-  <span>endRange: {{ endRange | json }}</span>
-  <span>updateRange: {{ updateRange | json }}</span>
-  <span>isSelected: {{ isSelected | json }}</span>
-</div>
-<div>toMerge: {{ toMerge | json }}</div>
 <strong>selectedRange: {{ selectedRange | json }}</strong>
+<div>
+  <!-- <span>{{ rowSpan_tablec_spec_colSpan }}</span>
+  <span>startRange: {{ startRange | json }}</span>
 
-<pre>{{this.testTable | json}}</pre>
+
+  <span>isSelected: {{ isSelected | json }}</span> -->
+  <span>updateRange: {{ updateRange | json }}</span>
+  <strong>{{ mouseDown }}</strong>
+</div>
+<!-- <pre>{{ position | json }}</pre> -->
+<pre>endRange: {{ endRange | json }}</pre>
+<div>toMerge: {{ toMerge | json }}</div>
+
+<!-- <pre>selectedTable {{ selectedTable | json }}</pre> -->
+<pre>{{ this.testTable | json }}</pre>
