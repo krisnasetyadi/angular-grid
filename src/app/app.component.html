@@ -11,9 +11,8 @@
             (mousedown)="startSelecting(rowIndex, colIndex)"
             (mouseup)="endSelecting(rowIndex, colIndex)"
             (mouseover)="updateSelection(rowIndex, colIndex)"
-            (click)="handleCellClick(field)"
           >
-            <!-- <p>{{ rowIndex }}, {{ colIndex }}</p> -->
+            <!-- <p>{{ rowIndex }}, {{ colIndex }}</p> (click)="handleCellClick(field)" -->
             <span style="user-select: none">{{
               field.cell?.name || "empty"
             }}</span>
@@ -25,7 +24,7 @@
     <div style="margin-top: 10px">
       <button style="user-select: none" (click)="mergeCells()">Merge</button>
       <button style="user-select: none" (click)="undoMergeCells()">
-        Undo Merge
+        un-Merge
       </button>
       <button style="user-select: none" (click)="generateTable()">Reset</button>
     </div>
@@ -38,12 +37,18 @@
 
 
   <span>isSelected: {{ isSelected | json }}</span> -->
-  <span>updateRange: {{ updateRange | json }}</span>
-  <strong>{{ mouseDown }}</strong>
+  <span>updateRangetest: {{ updateRange | json }}</span>
+  <strong>{{ mouseDown }} {{ kesini }}</strong>
 </div>
 <!-- <pre>{{ position | json }}</pre> -->
-<pre>endRange: {{ endRange | json }}</pre>
-<div>toMerge: {{ toMerge | json }}</div>
+<pre>endRange: {{ updateRangetest | json }}</pre>
+<div style="display: flex; justify-content: space-between">
+  <div>
+    <pre>toMerge: {{ toMerge | json }}</pre>
+  </div>
+  <div>
+    <pre>testTable : {{ this.tableData | json }}</pre>
+  </div>
+</div>
 
 <!-- <pre>selectedTable {{ selectedTable | json }}</pre> -->
-<pre>{{ this.testTable | json }}</pre>

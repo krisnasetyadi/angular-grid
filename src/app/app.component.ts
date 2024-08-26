@@ -27,7 +27,7 @@ export class AppComponent {
   };
   selectedRange = this.defaultSelectedRangeValue;
   startRange = {};
-  endRange = {};
+  updateRangetest = {};
   updateRange = {};
   isSelected = {};
   mouseDown = false;
@@ -89,9 +89,9 @@ export class AppComponent {
     return { row: field.spanInfo.rowSpan, col: field.spanInfo.colSpan };
   }
 
-  handleCellClick(field: any) {
-    console.log('field', field);
-  }
+  // handleCellClick(field: any) {
+  //   console.log('field', field);
+  // }
 
   rowSpan_tablec_spec_colSpan: any = [];
   startSelecting(rowIndex: number, colIndex: number) {
@@ -110,6 +110,8 @@ export class AppComponent {
     // console.log('startSelecting', [])
   }
 
+  endRangeTest = {};
+
   endSelecting(rowIndex: number, colIndex: number) {
     this.mouseDown = false;
 
@@ -127,6 +129,14 @@ export class AppComponent {
         this.selectedRange.endCol = colIndex;
         this.selectedRange.endRow = startCellHasSpanned.rowSpan;
       }
+    } else if (isHorizontalSelection) {
+      if (startCellHasSpanned.rowSpan > 1) {
+        this.selectedRange.endRow = startCellHasSpanned.rowSpan - 1;
+        this.selectedRange.endCol = startCellHasSpanned.rowSpan;
+      } else if (startCellHasSpanned.colSpan > 1) {
+        this.selectedRange.endRow = startCellHasSpanned.colSpan - 1;
+        this.selectedRange.endCol = startCellHasSpanned.colSpan;
+      }
     } else {
       this.selectedRange = {
         ...this.selectedRange,
@@ -134,6 +144,14 @@ export class AppComponent {
         endCol: colIndex,
       };
     }
+
+    this.endRangeTest = {
+      ...this.selectedRange,
+      // spannedData:
+      //   this.tableData[this.selectedRange.startRow][
+      //     this.selectedRange.startCol
+      //   ],
+    };
   }
 
   updateSelection(rowIndex: number, colIndex: number) {
@@ -141,6 +159,7 @@ export class AppComponent {
       let cellGroup = [];
       let cellGrouHasRowSpanned: boolean = false;
       let cellGrouHasColSpanned: boolean = false;
+      let cellGroupHasRowAndColumnSpanned: boolean = false;
 
       cellGroup.push(this.tableData[rowIndex][colIndex]);
       cellGrouHasColSpanned = cellGroup.some(
@@ -149,14 +168,41 @@ export class AppComponent {
       cellGrouHasRowSpanned = cellGroup.some(
         (cell) => cell.spanInfo.rowSpan > 1
       );
+      cellGroupHasRowAndColumnSpanned = cellGroup.every((cell) => {
+        cell.spanInfo.rowSpan > 1 && cell.spanInfo.colSpan > 1;
+      });
+
+      console.log('selectedRange', this.selectedRange, rowIndex, colIndex);
 
       if (cellGrouHasColSpanned) {
         this.selectedRange.startCol = this.selectedRange.startCol + colIndex;
       } else if (cellGrouHasRowSpanned) {
-        this.selectedRange.startRow = this.selectedRange.startRow + rowIndex;
+        console.log('cellGrouHasRowSpanned');
+        if (
+          this.selectedRange.startRow > rowIndex &&
+          colIndex === this.selectedRange.startCol
+        ) {
+          console.log('cellGrouHasRowSpanned-if', colIndex);
+          this.selectedRange.startRow = this.selectedRange.startRow + rowIndex;
+          this.selectedRange.endRow = rowIndex;
+          if (this.selectedRange.startCol !== colIndex) {
+            console.log('dapet');
+          }
+        } else {
+          console.log('cellGrouHasRowSpanned-else');
+          this.selectedRange.startRow = this.selectedRange.startRow + rowIndex;
+        }
+      } else {
+        console.log('cellGrouHasRowSpanned_selected', rowIndex, colIndex);
+        if (this.startRange)
+          this.selectedRange = {
+            ...this.selectedRange,
+            endRow: rowIndex,
+            endCol: colIndex,
+          };
       }
 
-      this.endRange = {
+      this.updateRangetest = {
         rowIndex,
         colIndex,
         cellGrouHasRowSpanned,
@@ -178,6 +224,8 @@ export class AppComponent {
     );
   }
 
+  kesini: any = [];
+
   updateCellToMerge(
     startRow: number,
     endRow: number,
@@ -187,7 +235,12 @@ export class AppComponent {
     for (let r = startRow; r <= endRow; r++) {
       for (let c = startCol; c <= endCol; c++) {
         if (r !== startRow || c !== startCol) {
-          this.toMerge[`${r}:${c}`] = { r, c, visibility: false };
+          this.toMerge[`${r}:${c}`] = {
+            ...this.tableData[r][c],
+            r,
+            c,
+            visibility: false,
+          };
           this.tableData[r][c] = {
             ...this.tableData[r][c],
             visibility: false,
@@ -230,18 +283,24 @@ export class AppComponent {
       }
     }
 
-    // const cellGrouHasSpanned = cellGroup.some(
-    //   (cell) => cell.spanInfo.colSpan > 1
-    // );
+    console.log('cellGroup', cellGroup);
 
-    if (startRow < endRow || startCol < endCol) {
-      this.updateCellToMerge(startRow, endRow, startCol, endCol);
-    } else if (startRow > endRow || startCol > endCol) {
-      this.updateCellToMerge(endRow, startRow, endCol, startCol);
+    if (startRow < endRow || startRow === endRow) {
+      if (startCol < endCol) {
+        this.updateCellToMerge(startRow, endRow, startCol, endCol);
+      } else {
+        this.updateCellToMerge(startRow, endRow, endCol, startCol);
+      }
+    } else if (startRow > endRow) {
+      if (startCol > endCol) {
+        this.updateCellToMerge(endRow, startRow, endCol, startCol);
+      } else {
+        this.updateCellToMerge(endRow, startRow, startCol, endCol);
+      }
     }
 
-    this.cdr.detectChanges();
-    this.testTable = [...this.tableData];
+    // this.cdr.detectChanges();
+    this.testTable = cellGroup;
   }
 
   undoMergeCells() {
@@ -273,6 +332,6 @@ export class AppComponent {
   }
 
   onmouseleave() {
-    this.mouseDown = false;
+    if (this.mouseDown) this.mouseDown = false;
   }
 }
