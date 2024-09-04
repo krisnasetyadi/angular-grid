@@ -1,6 +1,6 @@
 <div style="width: 100%; display: flex; justify-content: center">
   <div>
-    <table style="width: 500px" onmouseleave="onmouseleave()">
+    <table style="width: 500px" (mouseleave)="onmouseleave()">
       <tr *ngFor="let row of tableData; let rowIndex = index">
         <ng-container *ngFor="let field of row; let colIndex = index">
           <td
@@ -12,7 +12,8 @@
             (mouseup)="endSelecting(rowIndex, colIndex)"
             (mouseover)="updateSelection(rowIndex, colIndex)"
           >
-            <!-- <p>{{ rowIndex }}, {{ colIndex }}</p> (click)="handleCellClick(field)" -->
+            <!-- <p style="user-select: none">{{ rowIndex }}, {{ colIndex }}</p> -->
+            <!-- (click)="handleCellClick(field)" -->
             <span style="user-select: none">{{
               field.cell?.name || "empty"
             }}</span>
@@ -37,18 +38,18 @@
 
 
   <span>isSelected: {{ isSelected | json }}</span> -->
-  <span>updateRangetest: {{ updateRange | json }}</span>
-  <strong>{{ mouseDown }} {{ kesini }}</strong>
+  <!-- <span>updateRangetest: {{ updateRange | json }}</span>
+  <strong>{{ mouseDown }} {{ kesini }}</strong> -->
 </div>
 <!-- <pre>{{ position | json }}</pre> -->
-<pre>endRange: {{ updateRangetest | json }}</pre>
+<!-- <pre>endRange: {{ updateRangetest | json }}</pre> -->
 <div style="display: flex; justify-content: space-between">
-  <div>
+  <!-- <div>
     <pre>toMerge: {{ toMerge | json }}</pre>
   </div>
   <div>
     <pre>testTable : {{ this.tableData | json }}</pre>
-  </div>
+  </div> -->
 </div>
 
 <!-- <pre>selectedTable {{ selectedTable | json }}</pre> -->

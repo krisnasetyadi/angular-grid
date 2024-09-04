@@ -80,18 +80,12 @@ export class AppComponent {
       this.tableData[row][col] = value;
     });
 
-    console.log('this.tableData', this.tableData);
-
     return parent;
   }
 
   getSpan(field: any) {
     return { row: field.spanInfo.rowSpan, col: field.spanInfo.colSpan };
   }
-
-  // handleCellClick(field: any) {
-  //   console.log('field', field);
-  // }
 
   rowSpan_tablec_spec_colSpan: any = [];
   startSelecting(rowIndex: number, colIndex: number) {
@@ -107,7 +101,6 @@ export class AppComponent {
       endRow: rowIndex,
       endCol: colIndex,
     };
-    // console.log('startSelecting', [])
   }
 
   endRangeTest = {};
@@ -117,11 +110,15 @@ export class AppComponent {
 
     const isVerticalSelection = this.selectedRange.startCol === colIndex;
     const isHorizontalSelection = this.selectedRange.startRow === rowIndex;
+
     const startCellHasSpanned =
       this.tableData[this.selectedRange.startRow][this.selectedRange.startCol]
         ?.spanInfo;
 
-    if (isVerticalSelection) {
+    const cell =
+      this.tableData[this.selectedRange.startRow][this.selectedRange.startCol];
+
+    if (isVerticalSelection && !isHorizontalSelection) {
       if (startCellHasSpanned.colSpan > 1) {
         this.selectedRange.endRow = rowIndex;
         this.selectedRange.endCol = startCellHasSpanned.colSpan;
@@ -129,85 +126,85 @@ export class AppComponent {
         this.selectedRange.endCol = colIndex;
         this.selectedRange.endRow = startCellHasSpanned.rowSpan;
       }
-    } else if (isHorizontalSelection) {
+    } else if (isHorizontalSelection && !isVerticalSelection) {
       if (startCellHasSpanned.rowSpan > 1) {
         this.selectedRange.endRow = startCellHasSpanned.rowSpan - 1;
         this.selectedRange.endCol = startCellHasSpanned.rowSpan;
       } else if (startCellHasSpanned.colSpan > 1) {
         this.selectedRange.endRow = startCellHasSpanned.colSpan - 1;
         this.selectedRange.endCol = startCellHasSpanned.colSpan;
+      } else if (
+        !cell.visibility &&
+        this.selectedRange.startCol !== this.selectedRange.endCol
+      ) {
+        // in this condition it prevent weird selection to normal selection
+        for (let row = 0; row <= this.selectedRange.endRow; row++) {
+          for (
+            let col = this.selectedRange.startCol;
+            col === this.selectedRange.startCol;
+            col++
+          ) {
+            const eachCell = this.tableData[row][col];
+            if (!eachCell.visibility) {
+              continue;
+            } else {
+              this.selectedRange.startRow = row;
+            }
+          }
+        }
       }
-    } else {
-      this.selectedRange = {
-        ...this.selectedRange,
-        endRow: rowIndex,
-        endCol: colIndex,
-      };
+    }
+  }
+
+  rangeUpdate(
+    startRow: number,
+    startCol: number,
+    endRow: number,
+    endCol: number
+  ) {
+    let startRowUpdate = Math.min(startRow, endRow);
+
+    let startColumnUpdate = Math.min(startCol, endCol);
+
+    let endRowUpdate = Math.max(startRow, endRow);
+
+    let endColumnUpdate = Math.max(startCol, endCol);
+
+    let counter = 0;
+
+    if (startRowUpdate < endRowUpdate) {
+      for (let row = startRowUpdate; row <= endRowUpdate; row++) {
+        for (let col = startColumnUpdate; col <= endColumnUpdate; col++) {
+          const cell = this.tableData[row][col];
+          const { rowSpan, colSpan } = cell.spanInfo;
+
+          if (rowSpan > 1) {
+            endRowUpdate = Math.max(endRowUpdate, row + rowSpan - 1);
+          }
+          if (colSpan > 1) {
+            endColumnUpdate = Math.max(endColumnUpdate, col + colSpan - 1);
+          }
+        }
+        counter++;
+      }
     }
 
-    this.endRangeTest = {
-      ...this.selectedRange,
-      // spannedData:
-      //   this.tableData[this.selectedRange.startRow][
-      //     this.selectedRange.startCol
-      //   ],
+    this.selectedRange = {
+      startRow: startRowUpdate,
+      startCol: startColumnUpdate,
+      endRow: endRowUpdate,
+      endCol: endColumnUpdate,
     };
   }
 
   updateSelection(rowIndex: number, colIndex: number) {
     if (this.mouseDown) {
-      let cellGroup = [];
-      let cellGrouHasRowSpanned: boolean = false;
-      let cellGrouHasColSpanned: boolean = false;
-      let cellGroupHasRowAndColumnSpanned: boolean = false;
+      this.selectedRange.endRow = rowIndex;
+      this.selectedRange.endCol = colIndex;
 
-      cellGroup.push(this.tableData[rowIndex][colIndex]);
-      cellGrouHasColSpanned = cellGroup.some(
-        (cell) => cell.spanInfo.colSpan > 1
-      );
-      cellGrouHasRowSpanned = cellGroup.some(
-        (cell) => cell.spanInfo.rowSpan > 1
-      );
-      cellGroupHasRowAndColumnSpanned = cellGroup.every((cell) => {
-        cell.spanInfo.rowSpan > 1 && cell.spanInfo.colSpan > 1;
-      });
+      const { startRow, startCol, endRow, endCol } = this.selectedRange;
 
-      console.log('selectedRange', this.selectedRange, rowIndex, colIndex);
-
-      if (cellGrouHasColSpanned) {
-        this.selectedRange.startCol = this.selectedRange.startCol + colIndex;
-      } else if (cellGrouHasRowSpanned) {
-        console.log('cellGrouHasRowSpanned');
-        if (
-          this.selectedRange.startRow > rowIndex &&
-          colIndex === this.selectedRange.startCol
-        ) {
-          console.log('cellGrouHasRowSpanned-if', colIndex);
-          this.selectedRange.startRow = this.selectedRange.startRow + rowIndex;
-          this.selectedRange.endRow = rowIndex;
-          if (this.selectedRange.startCol !== colIndex) {
-            console.log('dapet');
-          }
-        } else {
-          console.log('cellGrouHasRowSpanned-else');
-          this.selectedRange.startRow = this.selectedRange.startRow + rowIndex;
-        }
-      } else {
-        console.log('cellGrouHasRowSpanned_selected', rowIndex, colIndex);
-        if (this.startRange)
-          this.selectedRange = {
-            ...this.selectedRange,
-            endRow: rowIndex,
-            endCol: colIndex,
-          };
-      }
-
-      this.updateRangetest = {
-        rowIndex,
-        colIndex,
-        cellGrouHasRowSpanned,
-        cellGrouHasColSpanned,
-      };
+      this.rangeUpdate(startRow, startCol, endRow, endCol);
     }
   }
 
@@ -283,8 +280,6 @@ export class AppComponent {
       }
     }
 
-    console.log('cellGroup', cellGroup);
-
     if (startRow < endRow || startRow === endRow) {
       if (startCol < endCol) {
         this.updateCellToMerge(startRow, endRow, startCol, endCol);
@@ -299,7 +294,7 @@ export class AppComponent {
       }
     }
 
-    // this.cdr.detectChanges();
+    this.cdr.detectChanges();
     this.testTable = cellGroup;
   }
 
