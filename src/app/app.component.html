@@ -1,7 +1,12 @@
 <div style="width: 100%; display: flex; justify-content: center">
   <div>
     <table style="width: 500px" (mouseleave)="onmouseleave()">
+      <thead style="user-select: none">
+        <th></th>
+        <th *ngFor="let col of getColumnHeaders()">{{ col }}</th>
+      </thead>
       <tr *ngFor="let row of tableData; let rowIndex = index">
+        <th style="user-select: none">{{ rowIndex + 1 }}</th>
         <ng-container *ngFor="let field of row; let colIndex = index">
           <td
             *ngIf="field.visibility"
@@ -12,11 +17,11 @@
             (mouseup)="endSelecting(rowIndex, colIndex)"
             (mouseover)="updateSelection(rowIndex, colIndex)"
           >
-            <!-- <p style="user-select: none">{{ rowIndex }}, {{ colIndex }}</p> -->
-            <!-- (click)="handleCellClick(field)" -->
-            <span style="user-select: none">{{
-              field.cell?.name || "empty"
-            }}</span>
+            <!-- contenteditable="true"
+          (input)="updateCellContent($event, row, colIndex)" -->
+            <span style="user-select: none"
+              >{{ field.cell?.name || "empty" }} - {{ field.cellIndex }}</span
+            >
           </td>
         </ng-container>
       </tr>
@@ -32,24 +37,6 @@
   </div>
 </div>
 <strong>selectedRange: {{ selectedRange | json }}</strong>
-<div>
-  <!-- <span>{{ rowSpan_tablec_spec_colSpan }}</span>
-  <span>startRange: {{ startRange | json }}</span>
+<div></div>
 
-
-  <span>isSelected: {{ isSelected | json }}</span> -->
-  <!-- <span>updateRangetest: {{ updateRange | json }}</span>
-  <strong>{{ mouseDown }} {{ kesini }}</strong> -->
-</div>
-<!-- <pre>{{ position | json }}</pre> -->
-<!-- <pre>endRange: {{ updateRangetest | json }}</pre> -->
-<div style="display: flex; justify-content: space-between">
-  <!-- <div>
-    <pre>toMerge: {{ toMerge | json }}</pre>
-  </div>
-  <div>
-    <pre>testTable : {{ this.tableData | json }}</pre>
-  </div> -->
-</div>
-
-<!-- <pre>selectedTable {{ selectedTable | json }}</pre> -->
+<div style="display: flex; justify-content: space-between"></div>
