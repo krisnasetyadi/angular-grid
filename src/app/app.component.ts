@@ -12,10 +12,39 @@ export class AppComponent {
   tableViewSpecs: any = data;
 
   constructor(private cdr: ChangeDetectorRef) {}
-
+  generateTableData: any;
   ngOnInit() {
-    this.generateTable();
+    this.generateTableData = this.generateTable();
   }
+
+  defaultCell = {
+    id: null,
+    name: null,
+    description: null,
+    type: 'Static Text',
+    default: null,
+    required: true,
+    minValue: null,
+    maxValue: null,
+    minValueInclusive: true,
+    maxValueInclusive: true,
+    absoluteMinValue: null,
+    absoluteMaxValue: null,
+    absoluteMinValueInclusive: true,
+    absoluteMaxValueInclusive: true,
+    minLength: null,
+    maxLength: null,
+    maxSelectableOptions: null,
+    uom: null,
+    validationHint: '',
+    absoluteValidationHint: '',
+    options: [],
+    files: [],
+    hasDigitalSignature: false,
+    signatures: null,
+    isNewOrAmended: false,
+    amendmentRemarks: null,
+  };
 
   tableData: any = [];
   sectionFieldListFormArray = [];
@@ -32,16 +61,12 @@ export class AppComponent {
   mouseDown = false;
 
   generateTable() {
-    this.testTable = [];
     const parent: any = {};
+    const rowsNumber = this.tableViewSpecs.tableViewSpecs.numberOfRows;
     const columnsNumber = this.tableViewSpecs.tableViewSpecs.numberOfColumns;
 
-    for (let i = 0; i < this.tableViewSpecs.tableViewSpecs.numberOfRows; i++) {
-      for (
-        let j = 0;
-        j < this.tableViewSpecs.tableViewSpecs.numberOfColumns;
-        j++
-      ) {
+    for (let i = 0; i < rowsNumber; i++) {
+      for (let j = 0; j < columnsNumber; j++) {
         parent[`${i}:${j}`] = { cellIndex: i * columnsNumber + j };
       }
     }
@@ -122,31 +147,31 @@ export class AppComponent {
     //   isHorizontalSelection,
     // ]);
     if (isVerticalSelection && !isHorizontalSelection) {
-      // console.log('1');
+      console.log('1');
       if (startCellHasSpanned.colSpan > 1) {
-        // console.log('2');
+        console.log('2');
         this.selectedRange.endRow = rowIndex;
         this.selectedRange.endCol = startCellHasSpanned.colSpan;
       } else if (startCellHasSpanned.rowSpan > 1) {
-        // console.log('3', startCellHasSpanned);
+        console.log('3', startCellHasSpanned);
         // this.selectedRange.endCol = colIndex;
         this.selectedRange.endRow = startCellHasSpanned.rowSpan;
       }
     } else if (isHorizontalSelection && !isVerticalSelection) {
       console.log('4', startCellHasSpanned);
       if (startCellHasSpanned.rowSpan > 1) {
-        // console.log('5');
-        this.selectedRange.endRow = startCellHasSpanned.rowSpan - 1;
+        console.log('5');
+        // this.selectedRange.endRow = startCellHasSpanned.rowSpan - 1;
         this.selectedRange.endCol = startCellHasSpanned.rowSpan;
       } else if (startCellHasSpanned.colSpan > 1) {
-        // console.log('6');
+        console.log('6');
         // this.selectedRange.endRow = startCellHasSpanned.colSpan - 1;
         this.selectedRange.endCol = startCellHasSpanned.colSpan;
       } else if (
         !cell.visibility &&
         this.selectedRange.startCol !== this.selectedRange.endCol
       ) {
-        // console.log('7');
+        console.log('7');
         // in this condition it prevent weird selection to normal selection
         for (let row = 0; row <= this.selectedRange.endRow; row++) {
           for (
@@ -164,59 +189,10 @@ export class AppComponent {
         }
       }
     } else if (isVerticalSelection && isHorizontalSelection) {
-      const rowNeighborStart = this.findNeighbor(rowIndex, colIndex, true);
-      // console.log('8', startCellHasSpanned);
+      // const rowNeighborStart = this.findNeighbor(rowIndex, colIndex, true);
+      console.log('8', startCellHasSpanned);
       // console.log('rowNeighborStart', rowNeighborStart);
     }
-  }
-
-  findNeighbor(rowIndex: number, colIndex: number, isVisible: boolean = false) {
-    const neighbors: any[] = [];
-    const tableRows = this.tableViewSpecs.tableViewSpecs.numberOfRows;
-    const tableCols = this.tableViewSpecs.tableViewSpecs.numberOfColumns;
-
-    // Directions for checking neighbors
-    const directions = [
-      { rowOffset: -1, colOffset: 0 }, // Top
-      { rowOffset: 1, colOffset: 0 }, // Bottom
-      { rowOffset: 0, colOffset: -1 }, // Left
-      { rowOffset: 0, colOffset: 1 }, // Right
-    ];
-
-    directions.forEach(({ rowOffset, colOffset }) => {
-      let r = rowIndex + rowOffset;
-      let c = colIndex + colOffset;
-
-      // Traverse to find the nearest visible or valid cell
-      while (r >= 0 && r < tableRows && c >= 0 && c < tableCols) {
-        const cell = this.tableData[r][c];
-        const { rowSpan, colSpan } = cell.spanInfo;
-
-        // Check if the cell is hidden and we are not looking for visible cells
-        if (!isVisible && !cell.visibility) {
-          neighbors.push({ row: r, col: c, cell });
-          break;
-        }
-
-        // If looking for visible cells and the cell is visible
-        else if (isVisible && cell.visibility) {
-          if (
-            !this.isCellSelected(r, c) &&
-            (cell.spanInfo.rowSpan > 1 || cell.spanInfo.colSpan > 1)
-          ) {
-            // if (neighbors.length === 0) {
-            neighbors.push({ row: r, col: c, cell });
-          }
-          // break;
-        }
-
-        // Adjust for span to skip hidden cells correctly
-        r += rowOffset * rowSpan;
-        c += colOffset * colSpan;
-      }
-    });
-
-    return neighbors;
   }
 
   rangeUpdate(
@@ -247,20 +223,30 @@ export class AppComponent {
       return;
     }
 
-    for (let row = startRowUpdate; row <= endRowUpdate; row++) {
-      for (let col = startColUpdate; col <= endColUpdate; col++) {
-        const cell = this.tableData[row][col];
-        console.log('cell_2', cell);
-        const { rowSpan, colSpan } = cell.spanInfo;
-        if (rowSpan > 1) {
-          console.log('range_3');
-          endRowUpdate = Math.max(endRowUpdate, row + rowSpan - 1);
-        }
-        if (colSpan > 1) {
-          endColUpdate = Math.max(endColUpdate, col + colSpan - 1);
-        }
-      }
-    }
+    let accrossGroup: any = {
+      startRowUpdate,
+      startColUpdate,
+    };
+
+    // for (let row = startRowUpdate; row <= endRowUpdate; row++) {
+    //   for (let col = startColUpdate; col <= endColUpdate; col++) {
+    //     const cell = this.tableData[row][col];
+    //     console.log('cell_2', cell);
+    //     const { rowSpan, colSpan } = cell.spanInfo;
+    //     if (rowSpan > 1) {
+    //       console.log('range_3');
+
+    //       endRowUpdate = Math.max(endRowUpdate, row + rowSpan - 1);
+    //       accrossGroup = { ...accrossGroup, endRowUpdate };
+    //     }
+    //     if (colSpan > 1) {
+    //       endColUpdate = Math.max(endColUpdate, col + colSpan - 1);
+    //       accrossGroup = { ...accrossGroup, endColUpdate };
+    //     }
+    //   }
+    // }
+
+    console.log('accrossGroup', accrossGroup);
     // Track visited cells to prevent reprocessing
     const visited = new Set<string>();
 
@@ -289,6 +275,7 @@ export class AppComponent {
         for (let c = startColUpdate; c <= endColUpdate; c++) {
           if (!visited.has(`${r},${c}`)) {
             if (this.tableData[r]?.[c]?.visibility) {
+              console.log('expandSelection', [r, c]);
               expandSelection(r, c);
               ++counter;
             } else {
@@ -351,38 +338,39 @@ export class AppComponent {
     const startRowOffset: Set<any> = new Set();
     const startColOffset: Set<any> = new Set();
 
-    // for (let row = startRowUpdate; row <= endRowUpdate; row++) {
-    //   for (let col = startColUpdate; col <= endColUpdate; col++) {
-    //     const cell = this.tableData[row][col];
+    for (let row = startRowUpdate; row <= endRowUpdate; row++) {
+      for (let col = startColUpdate; col <= endColUpdate; col++) {
+        console.log('expandSelection', [row, col]);
+        const cell = this.tableData[row][col];
 
-    //     const { rowSpan, colSpan } = cell.spanInfo;
-    //     const expanded: any = expandSelection(row, col);
+        const { rowSpan, colSpan } = cell.spanInfo;
+        const expanded: any = expandSelection(row, col);
 
-    //     const hasExpandedRow = expanded?.rows?.length > 0;
-    //     const hasExpandedCol = expanded?.cols?.length > 0;
+        const hasExpandedRow = expanded?.rows?.length > 0;
+        const hasExpandedCol = expanded?.cols?.length > 0;
 
-    //     if (expanded && (hasExpandedRow || hasExpandedCol)) {
-    //       if (hasExpandedRow) {
-    //         expanded.rows.forEach((row: any) => startRowOffset.add(row));
-    //       }
+        if (expanded && (hasExpandedRow || hasExpandedCol)) {
+          if (hasExpandedRow) {
+            expanded.rows.forEach((row: any) => startRowOffset.add(row));
+          }
 
-    //       if (colSpan > 1) {
-    //         if (hasExpandedCol) {
-    //           expanded.cols.forEach((col: any) => startColOffset.add(col));
-    //         }
-    //       }
-    //     } else {
-    //       if (rowSpan > 1) {
-    //         console.log('range_3');
-    //         endRowUpdate = Math.max(endRowUpdate, row + rowSpan - 1);
-    //       }
-    //       if (colSpan > 1) {
-    //         console.log('range_4');
-    //         endColUpdate = Math.max(endColUpdate, col + colSpan - 1);
-    //       }
-    //     }
-    //   }
-    // }
+          if (colSpan > 1) {
+            if (hasExpandedCol) {
+              expanded.cols.forEach((col: any) => startColOffset.add(col));
+            }
+          }
+        } else {
+          if (rowSpan > 1) {
+            console.log('range_3');
+            endRowUpdate = Math.max(endRowUpdate, row + rowSpan - 1);
+          }
+          if (colSpan > 1) {
+            console.log('range_4');
+            endColUpdate = Math.max(endColUpdate, col + colSpan - 1);
+          }
+        }
+      }
+    }
 
     const uniqueRows = Array.from(startRowOffset);
     const uniqueCols = Array.from(startColOffset);
@@ -472,8 +460,18 @@ export class AppComponent {
     }
   }
 
-  toMerge: any = {};
-  testTable: any = [];
+  isContentEditable(): boolean {
+    const { startRow, endRow, startCol, endCol } = this.selectedRange;
+
+    let isEditable = false;
+
+    if (startRow === endRow && startCol === endCol) {
+      isEditable = true;
+    }
+
+    return isEditable;
+  }
+
   mergeCells() {
     if (
       this.selectedRange.startRow === -1 &&
@@ -507,8 +505,8 @@ export class AppComponent {
 
     const { startRow, endRow, startCol, endCol } = this.selectedRange;
     const spanInfo = {
-      rowSpan: endRow - startRow - 1,
-      colSpan: endCol - startCol - 1,
+      rowSpan: 1,
+      colSpan: 1,
     };
     const currentCell = this.tableData[startRow][startCol];
     const hasSppannedInCurrentSingleSelectedArea =
@@ -517,16 +515,26 @@ export class AppComponent {
         (i) => i === startRow && i === startCol
       );
 
-    if (hasSppannedInCurrentSingleSelectedArea) {
+    const startRowMin = Math.min(startRow, endRow);
+    const startColMin = Math.min(startCol, endCol);
+    const endRowsMax = Math.max(startRow, endRow);
+    const endColMax = Math.max(startCol, endCol);
+
+    for (
+      let r = startRowMin;
+      r <= endRowsMax + (currentCell.spanInfo.rowSpan - 1);
+      r++
+    ) {
       for (
-        let r = startRow;
-        r <= endRow + (currentCell.spanInfo.rowSpan - 1);
-        r++
+        let c = startColMin;
+        c <= endColMax + (currentCell.spanInfo.colSpan - 1);
+        c++
       ) {
-        for (
-          let c = startCol;
-          c <= endCol + (currentCell.spanInfo.colSpan - 1);
-          c++
+        if (
+          r >= 0 &&
+          r < this.tableViewSpecs.tableViewSpecs.numberOfRows &&
+          c >= 0 &&
+          c < this.tableViewSpecs.tableViewSpecs.numberOfColumns
         ) {
           const cell = this.tableData[r][c];
 
@@ -535,40 +543,6 @@ export class AppComponent {
             visibility: true,
             spanInfo,
           };
-        }
-      }
-    } else {
-      for (
-        let r = startRow;
-        r <= endRow + (currentCell.spanInfo.rowSpan - 1);
-        r++
-      ) {
-        const rows: any[] = [];
-        for (
-          let c = startCol;
-          c <= endCol + (currentCell.spanInfo.colSpan - 1);
-          c++
-        ) {
-          const cell = this.tableData[r][c];
-
-          if (cell) {
-            const { visibility } = cell;
-            if (visibility) {
-              this.tableData[r][c] = {
-                ...this.tableData[r][c],
-
-                spanInfo: {
-                  rowSpan: 1,
-                  colSpan: 1,
-                },
-              };
-            } else {
-              this.tableData[r][c] = {
-                ...this.tableData[r][c],
-                visibility: true,
-              };
-            }
-          }
         }
       }
     }
@@ -600,5 +574,89 @@ export class AppComponent {
 
   updateCellContent(event: any, row: any, cellIndex: number) {
     row.cells[cellIndex].content = event.target.innerText;
+  }
+
+  showRowActionButton(rowIndex: number): any {
+    for (let r = rowIndex; r >= 0; r--) {
+      for (let c = 0; c < this.tableData[r].length; c++) {
+        const cell = this.tableData[r][c];
+
+        if (cell.spanInfo.rowSpan > 1) {
+          if (r + cell.spanInfo.rowSpan - 1 === rowIndex) {
+            return true;
+          }
+
+          if (r + cell.spanInfo.rowSpan - 1 > rowIndex) {
+            return false;
+          }
+        }
+      }
+    }
+
+    return true;
+  }
+
+  deleteRows(rowIndexToDelete: number) {
+    const colChanges: number[] = [];
+    for (
+      let r = rowIndexToDelete;
+      r >= this.tableData.length - rowIndexToDelete;
+      r--
+    ) {
+      if (r !== rowIndexToDelete) {
+        for (let c = 0; c < this.tableData[r].length; c++) {
+          const previousCell = this.tableData[r][c];
+
+          if (previousCell.visibility && previousCell.spanInfo.rowSpan > 1) {
+            const { spanInfo } = previousCell;
+            const span = {
+              rowSpan: spanInfo.rowSpan - 1,
+              colSpan: spanInfo.colSpan,
+            };
+
+            this.tableData[r][c] = {
+              ...this.tableData[r][c],
+              spanInfo: span,
+            };
+
+            colChanges.push(c);
+          }
+        }
+      } else {
+        for (let c = 0; c < this.tableData[r].length; c++) {
+          const currentCell = this.tableData[r][c];
+
+          const { visibility } = currentCell;
+
+          if (!visibility && colChanges.some((changes) => changes === c)) {
+            this.tableData[r][c] = {
+              ...this.tableData[r][c],
+              visibility: true,
+            };
+          }
+        }
+      }
+    }
+
+    this.tableData.splice(rowIndexToDelete, 1);
+  }
+
+  addRow(indexToInsert: number) {
+    const cell = {
+      cell: this.defaultCell,
+      cellIndex: 3,
+      spanInfo: { rowSpan: 1, colSpan: 1 },
+      visibility: true,
+    };
+
+    const populateCell = new Array(
+      this.tableViewSpecs.tableViewSpecs.numberOfColumns
+    ).fill(cell);
+
+    console.log('populateCell', populateCell);
+    this.tableData.splice(indexToInsert + 1, 0, populateCell);
+
+    console.log('this.tableData', this.tableData);
+    // this.generateTableData = this.generateTable(this.tableData.length);
   }
 }
