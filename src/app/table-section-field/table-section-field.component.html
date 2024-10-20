@@ -1,0 +1,945 @@
+<div class="d-block">
+  <ng-container *ngIf="activateEditMode">
+    <div [ngSwitch]="sectionCellType" class="w-100">
+      <textarea *ngSwitchCase="formFieldTypes.Text" class="w-100"></textarea>
+      <input
+        *ngSwitchCase="formFieldTypes.Number"
+        type="number"
+        class="w-100"
+      />
+      <input *ngSwitchCase="formFieldTypes.Date" type="date" class="w-100" />
+      <div *ngSwitchCase="formFieldTypes.PassFail">
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            value="Passed"
+            [name]="ids.multipleOptionsPreview"
+            [id]="multipleOptionsPreview + '-passed'"
+          />
+          <label
+            class="form-check-label"
+            [htmlFor]="multipleOptionsPreview + '-passed'"
+            >Passed</label
+          >
+        </div>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            value="Failed"
+            [name]="ids.multipleOptionsPreview"
+            [id]="multipleOptionsPreview + '-failed'"
+          />
+          <label
+            class="form-check-label"
+            [htmlFor]="multipleOptionsPreview + '-failed'"
+            >Failed</label
+          >
+        </div>
+      </div>
+      <div *ngSwitchCase="formFieldTypes.RadioButtonGroup">
+        <div
+          class="form-check"
+          *ngFor="let option of multipleOptionsFormControl.value"
+        >
+          <input
+            class="form-check-input"
+            type="radio"
+            [name]="ids.multipleOptionsPreview"
+            [id]="multipleOptionsPreview + option"
+          />
+          <label
+            class="form-check-label"
+            [htmlFor]="multipleOptionsPreview + option"
+          >
+            {{ option }}
+          </label>
+        </div>
+      </div>
+      <div *ngSwitchCase="formFieldTypes.MultipleOptions">
+        <div
+          class="form-check"
+          *ngFor="let option of multipleOptionsFormControl.value"
+        >
+          <input
+            type="checkbox"
+            class="form-check-input"
+            [name]="ids.multipleOptionsPreview"
+            [id]="multipleOptionsPreview + option"
+          />
+          <label
+            class="form-check-label"
+            [htmlFor]="multipleOptionsPreview + option"
+            >{{ option }}</label
+          >
+        </div>
+      </div>
+      <div *ngSwitchCase="formFieldTypes.DigitalSignature">
+        <ng-container
+          *ngFor="
+            let signature of signaturesFormGroups;
+            let signatureIdx;
+            of: index
+          "
+        >
+          <p class="font-weight-bold">
+            {{ signature.value.label }}
+            <span *ngIf="signature.value.required" style="color: red">*</span>
+          </p>
+          <ul class="field-ul">
+            <li *ngFor="let role of signature.value.signatureRoles">
+              {{ role }}
+            </li>
+          </ul>
+        </ng-container>
+      </div>
+      <ng-container *ngSwitchCase="formFieldTypes.RichText">
+        <ckeditor [editor]="editor" [config]="config"></ckeditor>
+      </ng-container>
+      <div *ngSwitchCase="formFieldTypes.Tme">
+        <button class="btn btn-primary btn-sm" disabled>Tag Tools</button>
+      </div>
+
+      <div
+        *ngSwitchCase="formFieldTypes.StaticRichText"
+        [innerHTML]="cellLabel"
+      ></div>
+
+      <p *ngSwitchDefault>
+        {{ cellLabel }}
+      </p>
+    </div>
+  </ng-container>
+  <ng-container *ngIf="!activateEditMode">
+    <div [ngSwitch]="sectionCellType" class="w-100">
+      <textarea
+        *ngSwitchCase="formFieldTypes.Text"
+        type="text"
+        class="w-100"
+      ></textarea>
+      <input
+        *ngSwitchCase="formFieldTypes.Number"
+        type="number"
+        class="w-100"
+      />
+      <input *ngSwitchCase="formFieldTypes.Date" type="date" class="w-100" />
+      <div *ngSwitchCase="formFieldTypes.PassFail">
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            value="Passed"
+            name="{{
+              'preview_' + tableIndex + '_' + rowIndex + '_' + colIndex
+            }}"
+          />
+          <label class="form-check-label">Passed</label>
+        </div>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            value="Failed"
+            name="{{
+              'preview_' + tableIndex + '_' + rowIndex + '_' + colIndex
+            }}"
+          />
+          <label class="form-check-label">Failed</label>
+        </div>
+      </div>
+      <div *ngSwitchCase="formFieldTypes.RadioButtonGroup">
+        <div
+          class="form-check"
+          *ngFor="let option of multipleOptionsFormControl.value"
+        >
+          <input
+            class="form-check-input"
+            type="radio"
+            name="{{
+              'preview_' + tableIndex + '_' + rowIndex + '_' + colIndex
+            }}"
+          />
+          <label class="form-check-label">
+            {{ option }}
+          </label>
+        </div>
+      </div>
+      <div *ngSwitchCase="formFieldTypes.MultipleOptions">
+        <div
+          class="form-check"
+          *ngFor="let option of multipleOptionsFormControl.value"
+        >
+          <input type="checkbox" class="form-check-input" />
+          <label class="form-check-label">{{ option }}</label>
+        </div>
+      </div>
+      <div *ngSwitchCase="formFieldTypes.DigitalSignature">
+        <ng-container
+          *ngFor="
+            let signature of signaturesFormGroups;
+            let signatureIdx;
+            of: index
+          "
+        >
+          <p class="font-weight-bold">
+            {{ signature.value.label }}
+            <span *ngIf="signature.value.required" style="color: red">*</span>
+          </p>
+          <ul class="field-ul">
+            <li *ngFor="let role of signature.value.signatureRoles">
+              {{ role }}
+            </li>
+          </ul>
+        </ng-container>
+      </div>
+      <ng-container *ngSwitchCase="formFieldTypes.RichText">
+        <ckeditor [editor]="editor" [config]="config"></ckeditor>
+      </ng-container>
+      <div *ngSwitchCase="formFieldTypes.Tme">
+        <button class="btn btn-primary btn-sm" disabled>Tag Tools</button>
+      </div>
+
+      <div
+        *ngSwitchCase="formFieldTypes.StaticRichText"
+        [innerHTML]="cellLabel"
+      ></div>
+
+      <p *ngSwitchDefault>{{ cellLabel }}</p>
+    </div>
+  </ng-container>
+</div>
+
+<!-- Modal -->
+<ng-template #cellFieldModal>
+  <div class="modal-header">
+    <h5 class="modal-title">Edit cell</h5>
+    <button
+      type="button"
+      class="close"
+      aria-label="Close"
+      (click)="dismissModal()"
+      style="outline: none"
+    >
+      <span aria-hidden="true">&times;</span>
+    </button>
+  </div>
+  <div class="modal-body" [formGroup]="tempFieldFormGroup">
+    <label>Type</label>
+    <ng-select
+      class="mb-4"
+      [(ngModel)]="cellType"
+      [items]="cellTypes"
+      [ngModelOptions]="{ standalone: true }"
+      (change)="onCellTypeChange($event)"
+    >
+    </ng-select>
+    <ng-container [ngSwitch]="cellType">
+      <ng-container *ngSwitchCase="formFieldTypes.StaticText">
+        <input
+          type="text"
+          class="form-control"
+          [id]="ids.fieldNameId"
+          formControlName="name"
+          [attr.disabled]="!activateEditMode ? true : null"
+        />
+      </ng-container>
+      <ng-container *ngSwitchCase="formFieldTypes.StaticRichText">
+        <div></div>
+        <ckeditor
+          [editor]="editor"
+          [config]="config"
+          [id]="ids.fieldNameId"
+          formControlName="name"
+        ></ckeditor>
+      </ng-container>
+      <ng-container *ngSwitchCase="formFieldTypes.DigitalSignature">
+        <div class="row mb-4 no-gutters">
+          <label [htmlFor]="ids.signatures" class="emphasize">Signatures</label>
+
+          <table class="table table-sm" formArrayName="signatures">
+            <thead>
+              <tr>
+                <th scope="col">Signature Label</th>
+                <th scope="col">Required?</th>
+                <th scope="col" *ngIf="hasSignatureRole">
+                  {{ labels.signatureRole }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                *ngFor="
+                  let signature of this.tempSignaturesFormGroups;
+                  let i = index
+                "
+                [formGroup]="signature"
+              >
+                <td>
+                  <div class="input-group">
+                    <div
+                      class="input-group-prepend"
+                      [ngClass]="{
+                        invisible:
+                          tempSignaturesFormControl?.value?.length === 1
+                      }"
+                    >
+                      <button
+                        type="button"
+                        class="btn text-danger"
+                        (click)="deleteSignature(i)"
+                        [hidden]="!activateEditMode"
+                      >
+                        <span aria-hidden="true" [hidden]="!activateEditMode"
+                          >&times;</span
+                        >
+                      </button>
+                    </div>
+
+                    <input
+                      type="text"
+                      style="width: 80%"
+                      class="form-control form-control-sm"
+                      id="{{ ids.signatures + '-' + i }}"
+                      formControlName="label"
+                      [attr.disabled]="!activateEditMode ? true : null"
+                    />
+
+                    <div
+                      *ngIf="
+                        signature.controls.label.errors &&
+                        (signature.controls.label.dirty ||
+                          signature.controls.label.touched ||
+                          submitted)
+                      "
+                      class="alert alert-danger"
+                    >
+                      <div *ngIf="signature.controls.label.errors.required">
+                        The label is required.
+                      </div>
+                      <div *ngIf="signature.controls.label.errors.maxlength">
+                        The maximum length of the label field is
+                        {{ LabelMaxLength }} characters.
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <input
+                    type="checkbox"
+                    id="{{ ids.signatures + '-required-' + i }}"
+                    formControlName="required"
+                    [attr.disabled]="!activateEditMode ? true : null"
+                  />
+                </td>
+                <td *ngIf="hasSignatureRole">
+                  <ng-select
+                    [items]="signatureRoles"
+                    formControlName="signatureRoles"
+                    placeholder="Select certifications"
+                    [readonly]="!activateEditMode"
+                    [multiple]="true"
+                  >
+                  </ng-select>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <button
+            type="button"
+            class="btn btn-sm btn-light mt-2"
+            (click)="addNewSignature()"
+            [hidden]="!activateEditMode"
+          >
+            Add Signature
+          </button>
+        </div>
+      </ng-container>
+      <ng-container *ngSwitchDefault>
+        <div class="d-flex" novalidate>
+          <div class="container animated fadeIn">
+            <div class="row mb-md-3">
+              <div class="col-sm-12">
+                <label
+                  [htmlFor]="ids.fieldNameId"
+                  class="font-weight-bold text-primary h5"
+                  >{{ rowIndex + 1 + getAlphabetIndex(colIndex) + ". "
+                  }}{{ labels.fieldName }}
+                </label>
+                <input
+                  type="text"
+                  class="form-control"
+                  [id]="ids.fieldNameId"
+                  formControlName="name"
+                  [attr.disabled]="!activateEditMode ? true : null"
+                />
+                <div
+                  *ngIf="
+                    (sectionFieldFormGroup.controls.name.dirty ||
+                      sectionFieldFormGroup.controls.name.touched ||
+                      submitted) &&
+                    sectionFieldFormGroup.controls.name.errors
+                  "
+                  class="alert alert-danger"
+                >
+                  {{ getErrorMessage("name") }}
+                </div>
+              </div>
+            </div>
+            <div class="row mb-md-3">
+              <div
+                class="col-md-12"
+                *ngIf="getFormControl('description').value || activateEditMode"
+              >
+                <label [htmlFor]="ids.descriptionId" class="emphasize"
+                  >Description</label
+                >
+                <div
+                  *ngIf="!activateEditMode || !editRichTextbox"
+                  [innerHTML]="getFormControl('description').value || ''"
+                ></div>
+                <ckeditor
+                  *ngIf="activateEditMode && editRichTextbox"
+                  [id]="ids.descriptionId"
+                  [editor]="editor"
+                  [config]="config"
+                  formControlName="description"
+                >
+                </ckeditor>
+                <button
+                  type="button"
+                  class="btn btn-light"
+                  (click)="editRichTextbox = !editRichTextbox"
+                  [hidden]="!activateEditMode || editRichTextbox"
+                >
+                  Edit Description
+                </button>
+                <button
+                  *ngIf="editRichTextbox"
+                  type="button"
+                  class="btn btn-light"
+                  (click)="editRichTextbox = !editRichTextbox"
+                  [hidden]="!activateEditMode"
+                >
+                  Finish Editing
+                </button>
+              </div>
+            </div>
+
+            <!-- Files Container Start-->
+            <div class="row mb-md-3">
+              <div class="col-md-12">
+                <app-files-container
+                  [activateEditMode]="activateEditMode"
+                  [filesFormArray]="filesFormArray"
+                  [uploadFilePathParts]="uploadFilePathParts"
+                >
+                </app-files-container>
+              </div>
+            </div>
+            <!-- Files Container End -->
+
+            <div class="row mb-md-3">
+              <div
+                class="col-md-6"
+                *ngIf="
+                  selectedFieldType?.hasDefaultValue &&
+                  (getFormControl('default').value || activateEditMode)
+                "
+              >
+                <label [htmlFor]="ids.defaultValueId" class="emphasize"
+                  >Default Value</label
+                >
+
+                <input
+                  type="text"
+                  class="form-control"
+                  [id]="ids.defaultValueId"
+                  formControlName="default"
+                  [attr.disabled]="!activateEditMode ? true : null"
+                />
+              </div>
+            </div>
+            <div class="row mb-md-3">
+              <div
+                class="col"
+                *ngIf="
+                  selectedFieldType.name != formFieldTypes.DigitalSignature
+                "
+              >
+                <input
+                  type="checkbox"
+                  [id]="ids.fieldRequiredId"
+                  formControlName="required"
+                  [attr.disabled]="!activateEditMode ? true : null"
+                />
+                <label [htmlFor]="ids.fieldRequiredId" class="emphasize">
+                  Is Required?</label
+                >
+              </div>
+              <div class="col">
+                <input
+                  type="checkbox"
+                  [id]="ids.newOrAmendedId"
+                  formControlName="isNewOrAmended"
+                  [attr.disabled]="!activateEditMode ? true : null"
+                  [checked]="isNewOrAmended"
+                />
+                <label [htmlFor]="ids.newOrAmendedId" class="emphasize">
+                  New or Amended?</label
+                >
+                <input
+                  type="text"
+                  class="form-control"
+                  [id]="ids.fieldAmendmentRemarksId"
+                  formControlName="amendmentRemarks"
+                  [attr.disabled]="!activateEditMode ? true : null"
+                  placeholder="Reason for Amendment"
+                  *ngIf="isNewOrAmended && activateEditMode"
+                />
+              </div>
+              <div
+                class="col-md-5"
+                *ngIf="
+                  cellType != formFieldTypes.Tme &&
+                  (getFormControl('validationHint')?.value || activateEditMode)
+                "
+              >
+                <label [htmlFor]="ids.validationHintId" class="emphasize">{{
+                  labels.validationHint
+                }}</label>
+
+                <div
+                  *ngIf="!activateEditMode || !editValidationHint"
+                  [innerHTML]="getFormControl('validationHint')?.value || ''"
+                ></div>
+                <ckeditor
+                  *ngIf="activateEditMode && editValidationHint"
+                  [id]="ids.validationHintId"
+                  [editor]="editor"
+                  [config]="config"
+                  formControlName="validationHint"
+                ></ckeditor>
+                <button
+                  type="button"
+                  class="btn btn-light"
+                  (click)="editValidationHint = !editValidationHint"
+                  [hidden]="!activateEditMode || editValidationHint"
+                >
+                  Edit {{ labels.validationHint }}
+                </button>
+                <span class="d-flex flex-row">
+                  <button
+                    *ngIf="editValidationHint"
+                    type="button"
+                    class="btn btn-sm flex-fill btn-light"
+                    (click)="editValidationHint = !editValidationHint"
+                    [hidden]="!activateEditMode"
+                  >
+                    Finish Editing
+                  </button>
+                  <button
+                    *ngIf="
+                      editValidationHint &&
+                      selectedFieldType.name == formFieldTypes.Number
+                    "
+                    type="button"
+                    class="btn btn-sm flex-fill btn-light"
+                    [hidden]="!activateEditMode"
+                    (click)="generateSpecificationHint()"
+                  >
+                    Generate Specs
+                  </button>
+                </span>
+              </div>
+            </div>
+
+            <div class="row mb-md-3">
+              <div
+                class="col-md-4"
+                *ngIf="
+                  selectedFieldType?.hasMinMaxLength &&
+                  (getFormControl('minLength').value || activateEditMode)
+                "
+              >
+                <label [htmlFor]="ids.minLengthId" class="emphasize"
+                  >Min Length</label
+                >
+                <input
+                  type="number"
+                  step="1"
+                  onkeypress="return (event.charCode == 8 || event.charCode == 0 || event.charCode == 13) ? null : event.charCode >= 48 && event.charCode <= 57"
+                  class="form-control"
+                  [id]="ids.minLengthId"
+                  formControlName="minLength"
+                  [attr.disabled]="!activateEditMode ? true : null"
+                />
+                <div
+                  *ngIf="
+                    (sectionFieldFormGroup.controls.minLength.dirty ||
+                      sectionFieldFormGroup.controls.minLength.touched ||
+                      submitted) &&
+                    sectionFieldFormGroup.controls.minLength.errors
+                  "
+                  class="alert alert-danger"
+                >
+                  {{ getErrorMessage("minLength") }}
+                </div>
+              </div>
+              <div
+                class="col-md-4"
+                *ngIf="
+                  selectedFieldType?.hasMinMaxLength &&
+                  (getFormControl('maxLength').value || activateEditMode)
+                "
+              >
+                <label [htmlFor]="ids.maxLengthId" class="emphasize"
+                  >Max Length</label
+                >
+                <input
+                  type="number"
+                  step="1"
+                  onkeypress="return (event.charCode == 8 || event.charCode == 0 || event.charCode == 13) ? null : event.charCode >= 48 && event.charCode <= 57"
+                  class="form-control"
+                  [id]="ids.maxLengthId"
+                  formControlName="maxLength"
+                  [attr.disabled]="!activateEditMode ? true : null"
+                />
+                <div
+                  *ngIf="
+                    (sectionFieldFormGroup.controls.maxLength.dirty ||
+                      sectionFieldFormGroup.controls.maxLength.touched ||
+                      submitted) &&
+                    sectionFieldFormGroup.controls.maxLength.errors
+                  "
+                  class="alert alert-danger"
+                >
+                  {{ getErrorMessage("maxLength") }}
+                </div>
+              </div>
+            </div>
+
+            <div class="row mb-md-3">
+              <div class="col-12">
+                <label
+                  class="emphasize"
+                  *ngIf="selectedFieldType?.hasMinMaxValue"
+                  >Design Spec</label
+                >
+              </div>
+              <div
+                class="col-md-4"
+                *ngIf="
+                  selectedFieldType?.hasMinMaxValue &&
+                  (getFormControl('minValue').value || activateEditMode)
+                "
+              >
+                <label [htmlFor]="ids.minValueId" class="emphasize"
+                  >Min Value</label
+                >
+                <div class="input-group">
+                  <div class="input-group-prepend">
+                    <select
+                      class="form-control input-group-text"
+                      [id]="ids.minValueInclusiveId"
+                      formControlName="minValueInclusive"
+                      [attr.disabled]="!activateEditMode ? true : null"
+                    >
+                      <option [ngValue]="true">&ge;</option>
+                      <option [ngValue]="false">&gt;</option>
+                    </select>
+                  </div>
+                  <input
+                    type="number"
+                    class="form-control"
+                    [id]="ids.minValueId"
+                    formControlName="minValue"
+                    [attr.disabled]="!activateEditMode ? true : null"
+                  />
+                </div>
+              </div>
+              <div
+                class="col-md-4"
+                *ngIf="
+                  selectedFieldType?.hasMinMaxValue &&
+                  (getFormControl('maxValue').value || activateEditMode)
+                "
+              >
+                <label [htmlFor]="ids.maxValueId" class="emphasize"
+                  >Max Value</label
+                >
+                <div class="input-group">
+                  <div class="input-group-prepend">
+                    <select
+                      class="form-control input-group-text"
+                      [id]="ids.maxValueInclusiveId"
+                      formControlName="maxValueInclusive"
+                      [attr.disabled]="!activateEditMode ? true : null"
+                    >
+                      <option [ngValue]="true">&le;</option>
+                      <option [ngValue]="false">&lt;</option>
+                    </select>
+                  </div>
+                  <input
+                    type="number"
+                    class="form-control"
+                    [id]="ids.maxValueId"
+                    formControlName="maxValue"
+                    [attr.disabled]="!activateEditMode ? true : null"
+                  />
+                </div>
+              </div>
+              <div
+                class="col-md-4"
+                *ngIf="
+                  selectedFieldType?.hasUom &&
+                  (getFormControl('uom').value || activateEditMode)
+                "
+              >
+                <label [htmlFor]="ids.uomId" class="emphasize"
+                  >Unit of Measure</label
+                >
+                <input
+                  type="text"
+                  class="form-control"
+                  [id]="ids.uomId"
+                  formControlName="uom"
+                  [attr.disabled]="!activateEditMode ? true : null"
+                />
+              </div>
+            </div>
+
+            <div class="row mb-md-3">
+              <div class="col-12">
+                <label
+                  class="emphasize"
+                  *ngIf="selectedFieldType?.hasAbsoluteMinMaxValue"
+                  >Absolute Limit</label
+                >
+              </div>
+              <div
+                class="col-md-4"
+                *ngIf="
+                  selectedFieldType?.hasAbsoluteMinMaxValue &&
+                  (getFormControl('absoluteMinValue').value || activateEditMode)
+                "
+              >
+                <label [htmlFor]="ids.absoluteMinValueId" class="emphasize"
+                  >Min Value</label
+                >
+                <div class="input-group">
+                  <div class="input-group-prepend">
+                    <select
+                      class="form-control input-group-text"
+                      [id]="ids.absoluteMinValueInclusiveId"
+                      formControlName="absoluteMinValueInclusive"
+                      [attr.disabled]="!activateEditMode ? true : null"
+                    >
+                      <option [ngValue]="true">&ge;</option>
+                      <option [ngValue]="false">&gt;</option>
+                    </select>
+                  </div>
+                  <input
+                    type="number"
+                    class="form-control"
+                    [id]="ids.absoluteMinValueId"
+                    formControlName="absoluteMinValue"
+                    [attr.disabled]="!activateEditMode ? true : null"
+                  />
+                </div>
+              </div>
+              <div
+                class="col-md-4"
+                *ngIf="
+                  selectedFieldType?.hasAbsoluteMinMaxValue &&
+                  (getFormControl('absoluteMaxValue').value || activateEditMode)
+                "
+              >
+                <label [htmlFor]="ids.absoluteMaxValueId" class="emphasize"
+                  >Max Value</label
+                >
+                <div class="input-group">
+                  <div class="input-group-prepend">
+                    <select
+                      class="form-control input-group-text"
+                      [id]="ids.absoluteMaxValueInclusiveId"
+                      formControlName="absoluteMaxValueInclusive"
+                      [attr.disabled]="!activateEditMode ? true : null"
+                    >
+                      <option [ngValue]="true">&le;</option>
+                      <option [ngValue]="false">&lt;</option>
+                    </select>
+                  </div>
+                  <input
+                    type="number"
+                    class="form-control"
+                    [id]="ids.absoluteMaxValueId"
+                    formControlName="absoluteMaxValue"
+                    [attr.disabled]="!activateEditMode ? true : null"
+                  />
+                </div>
+              </div>
+              <div
+                class="col-md-4"
+                *ngIf="
+                  (getFormControl('absoluteValidationHint').value ||
+                    activateEditMode) &&
+                  selectedFieldType.hasAbsoluteMinMaxValue
+                "
+              >
+                <label
+                  [htmlFor]="ids.absoluteValidationHintId"
+                  class="emphasize"
+                  >Spec/Tolerance</label
+                >
+
+                <div
+                  *ngIf="!activateEditMode || !editAbsoluteValidationHint"
+                  [innerHTML]="
+                    getFormControl('absoluteValidationHint').value || ''
+                  "
+                ></div>
+                <ckeditor
+                  *ngIf="activateEditMode && editAbsoluteValidationHint"
+                  [id]="ids.absoluteValidationHintId"
+                  [editor]="editor"
+                  [config]="config"
+                  formControlName="absoluteValidationHint"
+                ></ckeditor>
+                <button
+                  type="button"
+                  class="btn btn-light"
+                  (click)="
+                    editAbsoluteValidationHint = !editAbsoluteValidationHint
+                  "
+                  [hidden]="!activateEditMode || editAbsoluteValidationHint"
+                >
+                  Edit {{ labels.absoluteValidationHint }}
+                </button>
+                <span class="d-flex flex-row">
+                  <button
+                    *ngIf="editAbsoluteValidationHint"
+                    type="button"
+                    class="btn btn-sm flex-fill btn-light"
+                    (click)="
+                      editAbsoluteValidationHint = !editAbsoluteValidationHint
+                    "
+                    [hidden]="!activateEditMode"
+                  >
+                    Finish Editing
+                  </button>
+                  <button
+                    *ngIf="
+                      editAbsoluteValidationHint &&
+                      selectedFieldType.name == formFieldTypes.Number
+                    "
+                    type="button"
+                    class="btn btn-sm flex-fill btn-light"
+                    [hidden]="!activateEditMode"
+                    (click)="generateAbsoluteSpecificationHint()"
+                  >
+                    Generate Specs
+                  </button>
+                </span>
+              </div>
+            </div>
+
+            <div
+              class="row mb-md-3"
+              *ngIf="selectedFieldType?.hasMultipleOptions || false"
+            >
+              <div class="col-md-4" *ngIf="activateEditMode">
+                <label [htmlFor]="ids.multipleOptionsId" class="emphasize"
+                  >Add option</label
+                >
+                <input
+                  type="text"
+                  class="form-control"
+                  [id]="ids.multipleOptions"
+                  [attr.disabled]="!activateEditMode ? true : null"
+                  #optionInput
+                />
+
+                <button
+                  type="button"
+                  class="btn btn-light mt-2"
+                  (click)="addOption(optionInput.value)"
+                  [hidden]="!activateEditMode"
+                >
+                  Add
+                </button>
+              </div>
+
+              <div class="col-md-4">
+                <label class="emphasize">Options</label>
+                <ul class="field-ul">
+                  <li
+                    *ngFor="
+                      let option of tempMultipleOptionsFormControl.value;
+                      let i = index
+                    "
+                  >
+                    {{ option }}
+
+                    <button
+                      type="button"
+                      class="btn text-danger"
+                      (click)="deleteOption(i)"
+                      [hidden]="!activateEditMode"
+                    >
+                      <span aria-hidden="true" [hidden]="!activateEditMode"
+                        >&times;</span
+                      >
+                    </button>
+                  </li>
+                </ul>
+              </div>
+
+              <div
+                class="col-md-3"
+                *ngIf="selectedFieldType?.hasMaxSelectableOptions || false"
+              >
+                <label [htmlFor]="ids.maxSelectableOptions" class="emphasize"
+                  >Max Selectable Options</label
+                >
+                <input
+                  type="number"
+                  class="form-control"
+                  [id]="ids.maxSelectableOptions"
+                  formControlName="maxSelectableOptions"
+                  [attr.disabled]="!activateEditMode ? true : null"
+                  appOnlynumber
+                />
+
+                <div
+                  *ngIf="
+                    (sectionFieldFormGroup.controls.maxSelectableOptions
+                      .dirty ||
+                      sectionFieldFormGroup.controls.maxSelectableOptions
+                        .touched ||
+                      submitted) &&
+                    sectionFieldFormGroup.controls.maxSelectableOptions.errors
+                  "
+                  class="alert alert-danger"
+                >
+                  {{ getErrorMessage("maxSelectableOptions") }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- <ng-container *ngIf="isNewOrAmended && !activateEditMode; then amendmentRemarks"></ng-container> -->
+        </div>
+      </ng-container>
+    </ng-container>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-secondary" (click)="dismissModal()">
+      Close
+    </button>
+    <button type="button" class="btn btn-success" (click)="saveCellField()">
+      Save
+    </button>
+  </div>
+</ng-template>

@@ -1,8 +1,8 @@
-import data from '../shared/data';
 import {
   Component,
   ElementRef,
   EventEmitter,
+  HostListener,
   Input,
   OnDestroy,
   OnInit,
@@ -10,37 +10,62 @@ import {
   TemplateRef,
   ViewChild,
 } from '@angular/core';
-import { BsModalRef, BsModalService } from 'ngx-bootstrap/modal';
 import { FormArray, FormBuilder, FormControl, FormGroup } from '@angular/forms';
+import { BsModalRef, BsModalService } from 'ngx-bootstrap/modal';
 import { Observable, Subscription } from 'rxjs';
 
+import { AppToastService } from './services/AppToastService';
+
+// models
+import { AuthoredForm } from './type/authored-form.model';
+import { FormType } from './type/form-type.model';
+import { FormSectionFieldSpecs } from './type/form-specs.model';
+import { TableSectionViewSpecs } from './type/table-section-view-specs.model';
+
 // utils
+
 import {
   TableCellUtils,
   TableColumnUtils,
   TableRowUtils,
   FormBuilderTableSectionUtils,
-} from './utils/form-builder-table-sections/index';
+} from './utils/form-builder-table-sections';
+
+import { MODAL_OPTIONS_SM } from './constants/app-constants';
 
 import {
   Cell,
   RangeProperties,
   TableDataType,
 } from './type/table-section.model';
-import { MODAL_OPTIONS_SM } from './constants/app-constants';
+import FormBuilderUtils from './utils/form-builder.utils';
+import { dummy_form_data } from 'src/shared/form-data';
+
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss'],
 })
-export class AppComponent implements OnInit {
-  @ViewChild('mergeModal') mergeModalTemplate!: TemplateRef<any>;
-  @ViewChild('deleteRowModal')
-  deleteRowModalTemplate!: TemplateRef<any>;
-  @ViewChild('deleteColumnModal')
-  deleteColumnModalTemplate!: TemplateRef<any>;
+export class AppComponent implements OnInit, OnDestroy {
+  @ViewChild('tableContainer') tableContainer: ElementRef;
+  @ViewChild('tableBody') tableBody: ElementRef;
 
-  activateEditMode: boolean = false;
+  sectionIndex: number = 0;
+  sectionCount: number;
+  sectionFormGroup: FormGroup;
+  activateEditMode: boolean = true;
+  @Input() submitted: boolean;
+  authoredForm: any = dummy_form_data.data.authoredForm;
+  formTypeSpecs: FormType = dummy_form_data.data.formTypeSpecs;
+  sectionListFormArray: FormArray;
+
+  @Output() duplicateFormSection = new EventEmitter<number>();
+  @Output() deleteSectionEvent = new EventEmitter<number>();
+
+  @ViewChild('mergeModal') mergeModalTemplate: TemplateRef<any>;
+  @ViewChild('deleteRowModal') deleteRowModalTemplate: TemplateRef<any>;
+  @ViewChild('deleteColumnModal') deleteColumnModalTemplate: TemplateRef<any>;
+
   ids: any;
   tableData: TableDataType = [];
   selectedMergeRange: any;
@@ -51,18 +76,26 @@ export class AppComponent implements OnInit {
   isCollapsed: boolean = false;
   editRichTextbox: boolean = false;
 
-  modalRef: BsModalRef | undefined;
-  modalMessage: string | undefined;
-  initialRowsNumber: number | undefined;
-  initialColumnsNumber: number | undefined;
-  rowIndexToDelete!: number;
-  colIndexToDelete!: number;
+  fieldIdToDelete: number;
+  rowIndexToDelete: number;
+  colIndexToDelete: number;
+  initialRowsNumber: number;
+  initialColumnsNumber: number;
+
+  modalMessage: string;
+  manualReferenceName: string;
+
+  modalRef: BsModalRef;
+  editModalRef: BsModalRef;
+
   currentModalTemplate: TemplateRef<any> | null = null;
 
-  sectionFieldListFormArray: FormArray | undefined;
+  sectionFieldListFormArray: FormArray;
 
-  tableViewSpecs: any;
+  tableViewSpecs: TableSectionViewSpecs;
 
+  sectionToggleSubscription: Subscription;
+  formBuilderFormGroup: FormGroup;
   selectedFieldToCopy: any = {
     status: false,
     value: {},
@@ -76,7 +109,7 @@ export class AppComponent implements OnInit {
   };
 
   selectedRange: RangeProperties = this.defaultSelectedRangeValue;
-
+  formVersionId: number = 1767;
   defaultCell = {
     cellIndex: null,
     cell: FormBuilderTableSectionUtils.defaultEmptyCell(),
@@ -84,25 +117,45 @@ export class AppComponent implements OnInit {
     visibility: true,
   };
 
+  // Table Stack  purposes is store changes in table to achieve undo and redo action
+  undoTableStack = [];
+  redoTableStack = [];
+  private readonly MAX_HISTORY = 10;
+
   constructor(
     private reactiveFormBuilder: FormBuilder,
+    private readonly toastService: AppToastService,
     private readonly modalService: BsModalService
   ) {}
 
   ngOnInit(): void {
-    // this.ids = FormBuilderTableSectionUtils.defaultIds(this.sectionIndex);
+    const response = dummy_form_data;
+    this.formBuilderFormGroup = FormBuilderUtils.createAuthoredFormFormGroup(
+      this.authoredForm,
+      this.formTypeSpecs,
+      this.reactiveFormBuilder,
+      !this.formVersionId
+    );
 
-    this.tableViewSpecs = data.tableViewSpecs as any;
-    this.initialRowsNumber = this.tableViewSpecs.numberOfRows;
-    this.initialColumnsNumber = this.tableViewSpecs.numberOfColumns;
+    this.sectionListFormArray = this.formBuilderFormGroup.controls
+      .sections as FormArray;
 
-    console.log('tableViewSpecs', this.tableViewSpecs);
+    this.sectionFormGroup = this.sectionListFormArray.controls[0] as FormGroup;
+    this.sectionCount = this.sectionListFormArray.controls.length;
+    console.log('sectionListFormArray', this.sectionListFormArray);
+
+    this.ids = FormBuilderTableSectionUtils.defaultIds(this.sectionIndex);
+
+    this.sectionFieldListFormArray = this.sectionFormGroup.controls
+      .fields as FormArray;
+    this.tableViewSpecs = this.sectionFormGroup.controls.tableViewSpecs
+      .value as TableSectionViewSpecs;
+
     if (
       !this.tableInit &&
       this.tableViewSpecs.numberOfRows > 0 &&
-      this.tableViewSpecs.numberOfColumns > 0
-      // &&
-      // this.sectionFieldListFormArray.length > 0
+      this.tableViewSpecs.numberOfColumns > 0 &&
+      this.sectionFieldListFormArray.length > 0
     ) {
       this.initializeTable(true).then(() => {});
     }
@@ -113,7 +166,9 @@ export class AppComponent implements OnInit {
       !this.tableViewSpecs.numberOfRows ||
       !this.tableViewSpecs.numberOfColumns
     ) {
-      return alert('Number of rows and columns must be min 1');
+      return await this.toastService.error(
+        'Number of rows and columns must be min 1'
+      );
     }
 
     // store initial value before generate table function
@@ -121,13 +176,12 @@ export class AppComponent implements OnInit {
     this.initialColumnsNumber = this.tableViewSpecs.numberOfColumns;
 
     if (
-      !onFirstLoad
-      // &&
-      // !FormBuilderTableSectionUtils.validateTableData(
-      //   this.tableData,
-      //   this.authoredForm,
-      //   this.sectionIndex
-      // )
+      !onFirstLoad &&
+      !FormBuilderTableSectionUtils.validateTableData(
+        this.tableData,
+        this.authoredForm,
+        this.sectionIndex
+      )
     ) {
       this.generateInitializeTable();
       this.updateTableDataAndTableViewSpecsToFormGroup();
@@ -140,6 +194,15 @@ export class AppComponent implements OnInit {
     this.initializeTableData = JSON.stringify(this.tableData);
     this.tableInit = true;
   }
+
+  ngOnDestroy(): void {
+    this.sectionToggleSubscription?.unsubscribe();
+  }
+
+  get formType(): string {
+    return this.authoredForm.formType;
+  }
+
   /**
    * Re-initialize table to begining
    */
@@ -197,14 +260,12 @@ export class AppComponent implements OnInit {
     this.tableData = [];
     const parent: any = {};
 
-    const fields = this.defaultCell;
+    const { fields } = this.sectionFormGroup.value;
     const { rowSpan, colSpan, visible } = this.tableViewSpecs;
 
-    for (let i = 0; i < this.tableViewSpecs.numberOfRows; i++) {
-      for (let j = 0; j < this.tableViewSpecs.numberOfColumns; j++) {
-        parent[`${i}:${j}`] = {
-          cellIndex: i * this.tableViewSpecs.numberOfColumns + j,
-        };
+    for (let i = 0; i < this.initialRowsNumber; i++) {
+      for (let j = 0; j < this.initialColumnsNumber; j++) {
+        parent[`${i}:${j}`] = { cellIndex: i * this.initialColumnsNumber + j };
       }
     }
 
@@ -249,11 +310,9 @@ export class AppComponent implements OnInit {
     this.tableData = [];
     const parent: any = {};
 
-    for (let i = 0; i < this.tableViewSpecs.numberOfRows; i++) {
-      for (let j = 0; j < this.tableViewSpecs.numberOfColumns; j++) {
-        parent[`${i}:${j}`] = {
-          cellIndex: i * this.tableViewSpecs.numberOfColumns + j,
-        };
+    for (let i = 0; i < this.initialRowsNumber; i++) {
+      for (let j = 0; j < this.initialColumnsNumber; j++) {
+        parent[`${i}:${j}`] = { cellIndex: i * this.initialColumnsNumber + j };
       }
     }
 
@@ -286,7 +345,7 @@ export class AppComponent implements OnInit {
    *  to update table data matrix to form array and table view specs to it object,
    *  the result will use as payload data
    */
-  updateTableDataAndTableViewSpecsToFormGroup() {
+  updateTableDataAndTableViewSpecsToFormGroup(action?: string) {
     const newTableViewSpecs = this.generateTableViewSpecs();
 
     const flattenedCell = FormBuilderTableSectionUtils.flattenArrayAs(
@@ -294,27 +353,93 @@ export class AppComponent implements OnInit {
       this.tableData
     );
 
-    // this.sectionFormGroup.get('tableViewSpecs')?.patchValue(newTableViewSpecs);
+    this.sectionFormGroup.get('tableViewSpecs')?.patchValue(newTableViewSpecs);
 
-    // this.replaceFormArrayValues(flattenedCell, this.sectionFieldListFormArray);
+    this.replaceFormArrayValues(flattenedCell, this.sectionFieldListFormArray);
     this.resetSelectedRange();
+
+    if (!action) {
+      this.saveState();
+      this.selectedFieldToCopy = {
+        status: false,
+        value: {},
+      };
+    }
+  }
+
+  private saveState() {
+    const currentState = JSON.stringify(this.tableData);
+    this.undoTableStack.push(currentState);
+    if (this.undoTableStack.length > this.MAX_HISTORY) {
+      this.undoTableStack.shift();
+    }
+    this.redoTableStack = [];
   }
 
   onReset() {
     this.tableData = JSON.parse(this.initializeTableData);
-    this.updateTableDataAndTableViewSpecsToFormGroup();
 
-    // if (
-    //   FormBuilderTableSectionUtils.validateTableData(
-    //     JSON.parse(this.initializeTableData),
-    //     // this.authoredForm,
-    //     // this.sectionIndex
-    //   )
-    // ) {
-    //   this.generateTable();
-    // } else {
-    this.generateInitializeTable();
-    // }
+    if (
+      FormBuilderTableSectionUtils.validateTableData(
+        JSON.parse(this.initializeTableData),
+        this.authoredForm,
+        this.sectionIndex
+      )
+    ) {
+      this.generateTable();
+    } else {
+      this.generateInitializeTable();
+    }
+    this.updateTableDataAndTableViewSpecsToFormGroup();
+    this.undoTableStack = [];
+    this.redoTableStack = [];
+    this.selectedFieldToCopy = {
+      status: false,
+      value: {},
+    };
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  handleKeyboardEvent(event: KeyboardEvent) {
+    // common keyboard or mac keyboard
+    if (event.ctrlKey || event.metaKey) {
+      switch (event.key.toLowerCase()) {
+        case 'z':
+          event.preventDefault();
+          this.undoTable();
+          break;
+        case 'y':
+          event.preventDefault();
+          this.redoTable();
+          break;
+        case 'c':
+          event.preventDefault();
+          if (this.isSelectedRangeHasValue()) {
+            this.copyCell(
+              this.selectedRange.startRow,
+              this.selectedRange.startCol
+            );
+          } else {
+            this.toastService.warning(
+              "Nothing to select! Please ensure there's a cell you select."
+            );
+          }
+          break;
+        case 'v':
+          event.preventDefault();
+          if (this.isSelectedRangeHasValue()) {
+            this.pasteCell(
+              this.selectedRange.startRow,
+              this.selectedRange.startCol
+            );
+          } else {
+            this.toastService.warning(
+              "Nothing to select! Please ensure there's a cell you select."
+            );
+          }
+          break;
+      }
+    }
   }
 
   resetSelectedRange() {
@@ -322,9 +447,13 @@ export class AppComponent implements OnInit {
   }
 
   confirmDeleteSection(): void {
-    // const parent = this.sectionFormGroup.parent as FormArray;
-    // this.deleteSectionEvent.emit(this.sectionIndex);
-    // parent.removeAt(this.sectionIndex);
+    const parent = this.sectionFormGroup.parent as FormArray;
+    this.deleteSectionEvent.emit(this.sectionIndex);
+    parent.removeAt(this.sectionIndex);
+  }
+
+  generatePathParts(): string[] {
+    return ['eFormBuilder', this.formType];
   }
 
   onMouseLeave() {
@@ -342,79 +471,6 @@ export class AppComponent implements OnInit {
     };
   }
 
-  rangeUpdate(
-    startRow: number,
-    startCol: number,
-    endRow: number,
-    endCol: number
-  ) {
-    let startRowUpdate = Math.min(startRow, endRow);
-    let startColUpdate = Math.min(startCol, endCol);
-    let endRowUpdate = Math.max(startRow, endRow);
-    let endColUpdate = Math.max(startCol, endCol);
-
-    const maxRow = this.tableData.length - 1;
-    const maxCol = this.tableData[0].length - 1;
-
-    // handle edge-to-edge selection
-    if (
-      startRowUpdate === 0 &&
-      endRowUpdate === maxRow &&
-      startColUpdate === 0 &&
-      endColUpdate === maxCol
-    ) {
-      this.selectedRange = {
-        startRow: 0,
-        startCol: 0,
-        endRow: maxRow,
-        endCol: maxCol,
-      };
-      return;
-    }
-
-    // expand the corners of the selection
-    const topLeft = TableCellUtils.expandMergedCell(
-      startRowUpdate,
-      startColUpdate,
-      this.tableData
-    );
-    const bottomRight = TableCellUtils.expandMergedCell(
-      endRowUpdate,
-      endColUpdate,
-      this.tableData
-    );
-
-    startRowUpdate = Math.min(startRowUpdate, topLeft.startRow);
-    startColUpdate = Math.min(startColUpdate, topLeft.startCol);
-    endRowUpdate = Math.max(endRowUpdate, bottomRight.endRow);
-    endColUpdate = Math.max(endColUpdate, bottomRight.endCol);
-
-    // check for any merged cells within the selection that extend outside the current range
-    for (let row = startRowUpdate; row <= endRowUpdate; row++) {
-      for (let col = startColUpdate; col <= endColUpdate; col++) {
-        const expanded = TableCellUtils.expandMergedCell(
-          row,
-          col,
-          this.tableData
-        );
-        startRowUpdate = Math.min(startRowUpdate, expanded.startRow);
-        startColUpdate = Math.min(startColUpdate, expanded.startCol);
-        endRowUpdate = Math.max(endRowUpdate, expanded.endRow);
-        endColUpdate = Math.max(endColUpdate, expanded.endCol);
-      }
-    }
-
-    // update the selection range
-    this.selectedRange = {
-      startRow: startRowUpdate,
-      startCol: startColUpdate,
-      endRow: endRowUpdate,
-      endCol: endColUpdate,
-    };
-
-    // this.scrollYAxisIfNeeded(startRowUpdate, endRowUpdate);
-  }
-
   /**
    * Update seleted cell
    * @param rowIndex
@@ -424,7 +480,13 @@ export class AppComponent implements OnInit {
     if (this.mouseDown) {
       const { startRow, startCol } = this.selectedRange;
 
-      this.rangeUpdate(startRow, startCol, rowIndex, colIndex);
+      this.selectedRange = TableCellUtils.rangeUpdate(
+        startRow,
+        startCol,
+        rowIndex,
+        colIndex,
+        this.tableData
+      );
     }
   }
 
@@ -437,58 +499,58 @@ export class AppComponent implements OnInit {
     this.mouseDown = false;
   }
 
-  // scrollYAxisIfNeeded(startRowIndex: number, endRowIndex: number) {
-  //   const containerRect =
-  //     this.tableContainer.nativeElement.getBoundingClientRect();
-  //   const rowRect = this.tableBody.nativeElement.getBoundingClientRect();
-  //   const rows = this.tableBody.nativeElement.rows;
-  //   const startRowRect = rows[startRowIndex].getBoundingClientRect();
-  //   const endRowRect = rows[endRowIndex].getBoundingClientRect();
-  //   const bottomArea = endRowRect.bottom - startRowRect.bottom;
+  scrollYAxisIfNeeded(startRowIndex: number, endRowIndex: number) {
+    const containerRect =
+      this.tableContainer.nativeElement.getBoundingClientRect();
+    const rowRect = this.tableBody.nativeElement.getBoundingClientRect();
+    const rows = this.tableBody.nativeElement.rows;
+    const startRowRect = rows[startRowIndex].getBoundingClientRect();
+    const endRowRect = rows[endRowIndex].getBoundingClientRect();
+    const bottomArea = endRowRect.bottom - startRowRect.bottom;
 
-  //   const scrollThreshold = 100;
-  //   const scrollStep = 30;
+    const scrollThreshold = 100;
+    const scrollStep = 30;
 
-  //   const scrollDownCondition =
-  //     bottomArea > 100 &&
-  //     endRowRect.bottom > containerRect.bottom - scrollThreshold;
-  //   const scrollUpCondition =
-  //     endRowRect.top < containerRect.top + scrollThreshold;
+    const scrollDownCondition =
+      bottomArea > 100 &&
+      endRowRect.bottom > containerRect.bottom - scrollThreshold;
+    const scrollUpCondition =
+      endRowRect.top < containerRect.top + scrollThreshold;
 
-  //   const maxRowSpan = Math.max(
-  //     ...this.tableData[0].map((row: any) => row.spanInfo.rowSpan)
-  //   );
-  //   const totalRows = this.tableData.length;
+    const maxRowSpan = Math.max(
+      ...this.tableData[0].map((row: any) => row.spanInfo.rowSpan)
+    );
+    const totalRows = this.tableData.length;
 
-  //   if (
-  //     (startRowIndex === 0 && endRowIndex === 0) ||
-  //     endRowIndex === totalRows
-  //   ) {
-  //     this.endSelecting();
-  //     return;
-  //   }
-  //   const scrollDownSpeed: number = 800;
-  //   const scrollUpSpeed: number = 100;
-  //   if (scrollDownCondition && endRowIndex > 1) {
-  //     const scrollInterval = setInterval(() => {
-  //       if (this.mouseDown) {
-  //         this.tableContainer.nativeElement.scrollTop += scrollStep;
-  //       } else {
-  //         clearInterval(scrollInterval);
-  //       }
-  //     }, scrollDownSpeed);
-  //   }
+    if (
+      (startRowIndex === 0 && endRowIndex === 0) ||
+      endRowIndex === totalRows
+    ) {
+      this.endSelecting();
+      return;
+    }
+    const scrollDownSpeed: number = 800;
+    const scrollUpSpeed: number = 100;
+    if (scrollDownCondition && endRowIndex > 1) {
+      const scrollInterval = setInterval(() => {
+        if (this.mouseDown) {
+          this.tableContainer.nativeElement.scrollTop += scrollStep;
+        } else {
+          clearInterval(scrollInterval);
+        }
+      }, scrollDownSpeed);
+    }
 
-  //   if (scrollUpCondition && endRowIndex > 1) {
-  //     const scrollInterval = setInterval(() => {
-  //       if (this.mouseDown) {
-  //         this.tableContainer.nativeElement.scrollTop -= scrollStep;
-  //       } else {
-  //         clearInterval(scrollInterval);
-  //       }
-  //     }, scrollUpSpeed);
-  //   }
-  // }
+    if (scrollUpCondition && endRowIndex > 1) {
+      const scrollInterval = setInterval(() => {
+        if (this.mouseDown) {
+          this.tableContainer.nativeElement.scrollTop -= scrollStep;
+        } else {
+          clearInterval(scrollInterval);
+        }
+      }, scrollUpSpeed);
+    }
+  }
 
   getSpan(field: any) {
     return { row: field.spanInfo.rowSpan, col: field.spanInfo.colSpan };
@@ -517,8 +579,16 @@ export class AppComponent implements OnInit {
     );
   }
 
+  rearrangeSection(shift: number, currentIndex: number): void {
+    // FormBuilderUtils.rearrangeFormArrayPosition(
+    //   this.sectionListFormArray,
+    //   shift,
+    //   currentIndex
+    // );
+  }
+
   dismissModal() {
-    this.modalRef && this.modalRef.hide();
+    this.modalRef.hide();
   }
 
   insertColumn(colIndexToInsert: number) {
@@ -547,6 +617,8 @@ export class AppComponent implements OnInit {
   }
 
   showDeleteRowModal(rowIndex: number) {
+    this.rowIndexToDelete = rowIndex;
+
     this.modalRef = this.modalService.show(
       this.deleteRowModalTemplate,
       MODAL_OPTIONS_SM
@@ -617,10 +689,6 @@ export class AppComponent implements OnInit {
         this.updateTableDataAndTableViewSpecsToFormGroup();
       }
     }
-  }
-
-  openCellFieldModal() {
-    // this.tableSectionFieldComponent.openCellFieldModal();
   }
 
   showActionModal(existingValues: string[]) {
@@ -717,7 +785,9 @@ export class AppComponent implements OnInit {
       );
       this.updateTableDataAndTableViewSpecsToFormGroup();
     } else {
-      alert('The table must have at least one row. Deletion is not allowed.');
+      this.toastService.warning(
+        'The table must have at least one row. Deletion is not allowed.'
+      );
     }
     this.dismissModal();
     this.resetSelectedRange();
@@ -739,13 +809,13 @@ export class AppComponent implements OnInit {
     this.dismissModal();
   }
 
-  // getTableSectionField(rowIndex: number, colIndex: number) {
-  //   return FormBuilderUtils.createTableSectionFieldFormGroup(
-  //     this.tableData[rowIndex][colIndex].cell,
-  //     this.reactiveFormBuilder,
-  //     this.formTypeSpecs
-  //   );
-  // }
+  getTableSectionField(rowIndex: number, colIndex: number) {
+    return FormBuilderUtils.createTableSectionFieldFormGroup(
+      this.tableData[rowIndex][colIndex].cell,
+      this.reactiveFormBuilder,
+      this.formTypeSpecs
+    );
+  }
 
   getCellType(rowIndex: number, colIndex: number): string {
     return this.tableData[rowIndex][colIndex]?.cell?.type;
@@ -757,7 +827,7 @@ export class AppComponent implements OnInit {
 
   confirmDeleteColumn() {
     if (this.tableData[0].length <= 1) {
-      alert(
+      this.toastService.warning(
         'The table must have at least one column. Deletion is not allowed.'
       );
 
@@ -770,15 +840,15 @@ export class AppComponent implements OnInit {
     this.dismissModal();
   }
 
-  showPopUpBar(): boolean {
+  isSelectedRangeHasValue(): boolean {
     const keys = Object.keys(this.selectedRange);
 
     return keys.every((key) => this.selectedRange[key] !== -1);
   }
 
-  // openCellFieldModal() {
-  //   this.tableSectionFieldComponent.openCellFieldModal();
-  // }
+  openCellFieldModal() {
+    // this.tableSectionFieldComponent.openCellFieldModal();
+  }
 
   checkSelectedCopiedPosition(by?: string) {
     let passed = false;
@@ -793,7 +863,8 @@ export class AppComponent implements OnInit {
   }
 
   copyCell(rowIndex: number, colIndex: number) {
-    const fieldToCopied = this.tableData[rowIndex][colIndex].cell as any;
+    const fieldToCopied = this.tableData[rowIndex][colIndex]
+      .cell as FormSectionFieldSpecs;
 
     FormBuilderTableSectionUtils.resetFieldId(fieldToCopied);
 
@@ -804,7 +875,9 @@ export class AppComponent implements OnInit {
         copiedFrom: { row: rowIndex, col: colIndex },
       };
     } else {
-      alert("Nothing to copy! Please ensure there's something to duplicate.");
+      this.toastService.warning(
+        "Nothing to copy! Please ensure there's something to duplicate."
+      );
 
       // reset selection field
       this.selectedFieldToCopy = {
@@ -824,8 +897,20 @@ export class AppComponent implements OnInit {
       if (Object.keys(fieldToCopyValue).length > 0) {
         this.tableData[rowIndex][colIndex].cell = fieldToCopyValue;
       }
-      this.updateTableDataAndTableViewSpecsToFormGroup();
+      this.updateTableDataAndTableViewSpecsToFormGroup('paste');
     }
+  }
+
+  isCellCopied(rowIndex: number, colIndex: number, by: string = '') {
+    const copiedFrom = this.selectedFieldToCopy.copiedFrom;
+
+    return (
+      by.length === 0 &&
+      Object.keys(this.selectedFieldToCopy).length > 0 &&
+      copiedFrom &&
+      copiedFrom?.row === rowIndex &&
+      copiedFrom?.col === colIndex
+    );
   }
 
   updateCellField() {
@@ -834,5 +919,35 @@ export class AppComponent implements OnInit {
 
   getAlphabetIndex(index: number): string {
     return (index + 10).toString(36).toUpperCase();
+  }
+
+  canUndo(): boolean {
+    return this.undoTableStack.length > 0;
+  }
+
+  canRedo(): boolean {
+    return this.redoTableStack.length > 0;
+  }
+
+  undoTable() {
+    if (this.canUndo()) {
+      const currentState = JSON.stringify(this.tableData);
+      this.redoTableStack.push(currentState);
+
+      const previousState = this.undoTableStack.pop()!;
+      this.tableData = JSON.parse(previousState);
+      this.updateTableDataAndTableViewSpecsToFormGroup('undo');
+    }
+  }
+
+  redoTable() {
+    if (this.canRedo()) {
+      const currentState = JSON.stringify(this.tableData);
+      this.undoTableStack.push(currentState);
+
+      const nextState = this.redoTableStack.pop()!;
+      this.tableData = JSON.parse(nextState);
+      this.updateTableDataAndTableViewSpecsToFormGroup('redo');
+    }
   }
 }

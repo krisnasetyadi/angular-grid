@@ -1,107 +1,144 @@
 <div class="card-body bg-white" (mouseleave)="onMouseLeave()">
-  <h5>Table</h5>
-  <div *ngIf="!tableInit" class="form-inline mb-2">
-    <div class="form-group">
-      <label class="mr-2" for="">Number of rows:</label>
-      <input
-        class="form-control"
-        type="number"
-        min="1"
-        [(ngModel)]="tableViewSpecs.numberOfRows"
-        [ngModelOptions]="{ standalone: true }"
-      />
+  <div style="width: 90%">
+    <h5>Table</h5>
+    <div *ngIf="!tableInit" class="form-inline mb-2">
+      <div class="form-group">
+        <label class="mr-2" for="">Number of rows:</label>
+        <input
+          class="form-control"
+          type="number"
+          min="1"
+          [(ngModel)]="tableViewSpecs.numberOfRows"
+          [ngModelOptions]="{ standalone: true }"
+        />
+      </div>
+      <div class="form-group ml-2">
+        <label class="mr-2" for="">Number of columns:</label>
+        <input
+          [id]="ids.columnCountId"
+          class="form-control"
+          type="number"
+          min="1"
+          [(ngModel)]="tableViewSpecs.numberOfColumns"
+          [ngModelOptions]="{ standalone: true }"
+        />
+      </div>
     </div>
-    <div class="form-group ml-2">
-      <label class="mr-2" for="">Number of columns:</label>
-      <input
-        [id]="ids.columnCountId"
-        class="form-control"
-        type="number"
-        min="1"
-        [(ngModel)]="tableViewSpecs.numberOfColumns"
-        [ngModelOptions]="{ standalone: true }"
-      />
-    </div>
-  </div>
-  <button
-    *ngIf="!tableInit"
-    type="button"
-    class="btn btn-light"
-    (click)="initializeTable()"
-  >
-    Initialize
-  </button>
+    <button
+      *ngIf="!tableInit"
+      type="button"
+      class="btn btn-light"
+      (click)="initializeTable()"
+    >
+      Initialize
+    </button>
 
-  <div *ngIf="tableInit" class="p-2 pr-2">
-    <div *ngIf="activateEditMode" class="table-section-toolbar">
-      <button
-        type="button"
-        class="toolbar-button"
-        style="user-select: none"
-        (click)="mergeCells()"
-      >
-        Merge
-      </button>
-      <button
-        type="button"
-        style="user-select: none"
-        (click)="undoMergeCells()"
-      >
-        Unmerge
-      </button>
-      <button type="button" style="user-select: none" (click)="onReset()">
-        Reset
-      </button>
-      <button
-        type="button"
-        (click)="copyCell(selectedRange.startRow, selectedRange.startCol)"
-      >
-        <i class="fa fa-lg fa-copy mr-1" aria-hidden="true"></i>
-      </button>
-      <button
-        type="button"
-        *ngIf="!checkSelectedCopiedPosition('paste')"
-        (click)="pasteCell(selectedRange.startRow, selectedRange.startCol)"
-      >
-        <i class="fa fa-lg fa-paste mr-1" aria-hidden="true"></i>
-      </button>
-      <button
-        title="Edit cell"
-        type="button"
-        (click)="openCellFieldModal()"
-        style="cursor: pointer"
-        class="mr-2"
-      >
-        <i class="fa fa-lg fa-pencil" aria-hidden="true"></i>
-      </button>
-    </div>
-    <div class="table-container" #tableContainer>
-      <table style="user-select: none">
-        <thead>
-          <th class="col-index" style="width: 6%"></th>
-          <th class="col-index" *ngFor="let col of getColumnHeaders()">
-            {{ col }}
-          </th>
-          <th *ngIf="activateEditMode" class="col-index" style="width: 15%">
-            Actions
-          </th>
-        </thead>
-        <tbody class="table-section-body" #tableBody>
-          <tr *ngFor="let row of tableData; let rowIndex = index">
-            <th class="row-index">
-              {{ rowIndex + 1 }}
+    <div *ngIf="tableInit" class="p-2 pr-2">
+      <div *ngIf="activateEditMode" class="table-section-toolbar">
+        <button
+          tooltip="Undo cell"
+          type="button"
+          (click)="undoTable()"
+          style="cursor: pointer"
+          [disabled]="!canUndo()"
+        >
+          <i class="fa fa-md fa-undo" aria-hidden="true"></i>
+        </button>
+
+        <button
+          tooltip="Redo cell"
+          type="button"
+          (click)="redoTable()"
+          style="cursor: pointer"
+          [disabled]="!canRedo()"
+        >
+          <i class="fa fa-md fa-repeat" aria-hidden="true"></i>
+        </button>
+
+        <span style="opacity: 0.2"> | </span>
+        <button
+          type="button"
+          class="toolbar-button"
+          style="user-select: none"
+          (click)="mergeCells()"
+        >
+          <img src="../assets/icons/merge-cells-horizontal-svgrepo-com.svg" />
+        </button>
+        <button
+          type="button"
+          style="user-select: none"
+          (click)="undoMergeCells()"
+        >
+          <img src="../assets/icons/expand-icon.svg" />
+        </button>
+
+        <span style="opacity: 0.2"> | </span>
+
+        <button
+          type="button"
+          (click)="copyCell(selectedRange.startRow, selectedRange.startCol)"
+        >
+          <!-- <i class="fa fa-lg fa-copy mr-1" aria-hidden="true"></i> -->
+          <img src="../assets/icons/file-copy-icon.svg" />
+        </button>
+        <button
+          type="button"
+          *ngIf="!checkSelectedCopiedPosition('paste')"
+          (click)="pasteCell(selectedRange.startRow, selectedRange.startCol)"
+        >
+          <!-- <i class="fa fa-lg fa-paste mr-1" aria-hidden="true"></i> -->
+          <img src="../assets/icons/file-paste-icon.svg" />
+        </button>
+
+        <button
+          title="Edit cell"
+          type="button"
+          (click)="openCellFieldModal()"
+          disabled
+          style="cursor: pointer"
+          class="mr-2"
+        >
+          <i class="fa fa-lg fa-pencil" aria-hidden="true"></i>
+        </button>
+        <span style="opacity: 0.2"> | </span>
+        <button type="button" style="user-select: none" (click)="onReset()">
+          <i class="fa fa-lg fa-refresh mr-1" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div>
+        <table
+          class="table-container"
+          #tableContainer
+          style="user-select: none"
+        >
+          <thead>
+            <th class="col-index" style="width: 6%"></th>
+            <th class="col-index" *ngFor="let col of getColumnHeaders()">
+              {{ col }}
             </th>
-            <ng-container *ngFor="let cell of row; let colIndex = index">
-              <td
-                *ngIf="cell.visibility"
-                [attr.rowspan]="getSpan(cell).row"
-                [attr.colspan]="getSpan(cell).col"
-                [class.selected]="isCellSelected(rowIndex, colIndex)"
-                (mousedown)="startSelecting(rowIndex, colIndex)"
-                (mouseup)="endSelecting()"
-                (mouseover)="updateSelection(rowIndex, colIndex)"
-              >
-                <!-- <app-table-section-field
+            <th *ngIf="activateEditMode" class="col-index" style="width: 15%">
+              Actions
+            </th>
+          </thead>
+          <tbody class="table-section-body" #tableBody>
+            <tr *ngFor="let row of tableData; let rowIndex = index">
+              <th class="row-index">
+                {{ rowIndex + 1 }}
+              </th>
+              <ng-container *ngFor="let cell of row; let colIndex = index">
+                <td
+                  *ngIf="cell.visibility"
+                  [attr.rowspan]="getSpan(cell).row"
+                  [attr.colspan]="getSpan(cell).col"
+                  [class.selected]="isCellSelected(rowIndex, colIndex)"
+                  (mousedown)="startSelecting(rowIndex, colIndex)"
+                  (mouseup)="endSelecting()"
+                  (mouseover)="updateSelection(rowIndex, colIndex)"
+                  [class.copied]="isCellCopied(rowIndex, colIndex)"
+                  (dblclick)="openCellFieldModal()"
+                >
+                  {{ cell.cell.name }}
+                  <!-- <app-table-section-field
                   [tableData]="tableData"
                   [rowIndex]="rowIndex"
                   [colIndex]="colIndex"
@@ -121,46 +158,45 @@
                   (onCellFieldSaved)="updateCellField()"
                 >
                 </app-table-section-field> -->
-              </td>
-            </ng-container>
-            <ng-container *ngIf="activateEditMode">
-              <td class="action-buttons">
-                <button type="button" (click)="showDeleteRowModal(rowIndex)">
+                </td>
+              </ng-container>
+              <ng-container *ngIf="activateEditMode">
+                <td class="action-buttons">
+                  <button type="button" (click)="showDeleteRowModal(rowIndex)">
+                    <i class="fa fa-lg fa-trash" aria-hidden="true"></i>
+                  </button>
+
+                  <button type="button" (click)="insertRow(rowIndex)">
+                    <i class="fa fa-lg fa-plus-circle" aria-hidden="true"></i>
+                  </button>
+
+                  <button type="button" (click)="duplicateRow(rowIndex)">
+                    <i class="fa fa-lg fa-clone" aria-hidden="true"></i>
+                  </button>
+                </td>
+              </ng-container>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr *ngIf="activateEditMode" class="table-section-action-column">
+              <td class="row-index"></td>
+              <td *ngFor="let col of tableData[0]; let colIndex = index">
+                <!-- class="action-buttons" -->
+                <button type="button" (click)="showDeleteColumnModal(colIndex)">
                   <i class="fa fa-lg fa-trash" aria-hidden="true"></i>
                 </button>
 
-                <button type="button" (click)="insertRow(rowIndex)">
+                <button type="button" (click)="insertColumn(colIndex)">
                   <i class="fa fa-lg fa-plus-circle" aria-hidden="true"></i>
                 </button>
-
-                <button type="button" (click)="duplicateRow(rowIndex)">
+                <button type="button" (click)="duplicateColumn(colIndex)">
                   <i class="fa fa-lg fa-clone" aria-hidden="true"></i>
                 </button>
               </td>
-            </ng-container>
-          </tr>
-        </tbody>
-        <tfoot>
-          <tr *ngIf="activateEditMode" class="table-section-action-column">
-            <td class="row-index"></td>
-            <td
-              *ngFor="let col of tableData[0]; let colIndex = index"
-              class="action-buttons"
-            >
-              <button type="button" (click)="showDeleteColumnModal(colIndex)">
-                <i class="fa fa-lg fa-trash" aria-hidden="true"></i>
-              </button>
-
-              <button type="button" (click)="insertColumn(colIndex)">
-                <i class="fa fa-lg fa-plus-circle" aria-hidden="true"></i>
-              </button>
-              <button type="button" (click)="duplicateColumn(colIndex)">
-                <i class="fa fa-lg fa-clone" aria-hidden="true"></i>
-              </button>
-            </td>
-          </tr>
-        </tfoot>
-      </table>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
   </div>
 </div>
