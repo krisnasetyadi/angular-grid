@@ -1,0 +1,47 @@
+
+// td, th {
+//     border: 1px solid #dddddd;
+//     text-align: left;
+//     padding: 8px;
+//   }
+  
+//   .selected {
+//     background-color: #cce5ff;
+//   }
+
+
+.table-container {
+  margin: 20px;
+  overflow-x: auto;
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    th,
+    td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+      position: relative;
+    }
+    td[hidden] {
+      display: none;
+    }
+    
+    .selected {
+      background-color: lightblue;
+    }
+
+    th {
+      background-color: #f4f4f4;
+    }
+
+    td.selected {
+      background-color: rgba(0, 123, 255, 0.2);
+    }
+
+    [contenteditable='true'] {
+      outline: none;
+    }
+  }
+}

@@ -1,73 +1,210 @@
-import { ChangeDetectorRef, Component } from '@angular/core';
 import data from '../shared/data';
+import {
+  Component,
+  ElementRef,
+  EventEmitter,
+  Input,
+  OnDestroy,
+  OnInit,
+  Output,
+  TemplateRef,
+  ViewChild,
+} from '@angular/core';
+import { BsModalRef, BsModalService } from 'ngx-bootstrap/modal';
+import { FormArray, FormBuilder, FormControl, FormGroup } from '@angular/forms';
+import { Observable, Subscription } from 'rxjs';
 
+// utils
+import {
+  TableCellUtils,
+  TableColumnUtils,
+  TableRowUtils,
+  FormBuilderTableSectionUtils,
+} from './utils/form-builder-table-sections/index';
+
+import {
+  Cell,
+  RangeProperties,
+  TableDataType,
+} from './type/table-section.model';
+import { MODAL_OPTIONS_SM } from './constants/app-constants';
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss'],
 })
-export class AppComponent {
-  title = 'spread-sheet';
+export class AppComponent implements OnInit {
+  @ViewChild('mergeModal') mergeModalTemplate!: TemplateRef<any>;
+  @ViewChild('deleteRowModal')
+  deleteRowModalTemplate!: TemplateRef<any>;
+  @ViewChild('deleteColumnModal')
+  deleteColumnModalTemplate!: TemplateRef<any>;
 
-  tableViewSpecs: any = data;
+  activateEditMode: boolean = false;
+  ids: any;
+  tableData: TableDataType = [];
+  selectedMergeRange: any;
+  initializeTableData: any;
 
-  constructor(private cdr: ChangeDetectorRef) {}
-  generateTableData: any;
-  ngOnInit() {
-    this.generateTableData = this.generateTable();
-  }
+  mouseDown: boolean = false;
+  tableInit: boolean = false;
+  isCollapsed: boolean = false;
+  editRichTextbox: boolean = false;
 
-  defaultCell = {
-    id: null,
-    name: null,
-    description: null,
-    type: 'Static Text',
-    default: null,
-    required: true,
-    minValue: null,
-    maxValue: null,
-    minValueInclusive: true,
-    maxValueInclusive: true,
-    absoluteMinValue: null,
-    absoluteMaxValue: null,
-    absoluteMinValueInclusive: true,
-    absoluteMaxValueInclusive: true,
-    minLength: null,
-    maxLength: null,
-    maxSelectableOptions: null,
-    uom: null,
-    validationHint: '',
-    absoluteValidationHint: '',
-    options: [],
-    files: [],
-    hasDigitalSignature: false,
-    signatures: null,
-    isNewOrAmended: false,
-    amendmentRemarks: null,
+  modalRef: BsModalRef | undefined;
+  modalMessage: string | undefined;
+  initialRowsNumber: number | undefined;
+  initialColumnsNumber: number | undefined;
+  rowIndexToDelete!: number;
+  colIndexToDelete!: number;
+  currentModalTemplate: TemplateRef<any> | null = null;
+
+  sectionFieldListFormArray: FormArray | undefined;
+
+  tableViewSpecs: any;
+
+  selectedFieldToCopy: any = {
+    status: false,
+    value: {},
   };
 
-  tableData: any = [];
-  sectionFieldListFormArray = [];
-  defaultSelectedRangeValue = {
+  defaultSelectedRangeValue: RangeProperties = {
     startRow: -1,
     startCol: -1,
     endRow: -1,
     endCol: -1,
   };
-  selectedRange = this.defaultSelectedRangeValue;
-  startRange = {};
-  updateRangetest = {};
-  updateRange = {};
-  mouseDown = false;
 
+  selectedRange: RangeProperties = this.defaultSelectedRangeValue;
+
+  defaultCell = {
+    cellIndex: null,
+    cell: FormBuilderTableSectionUtils.defaultEmptyCell(),
+    spanInfo: { rowSpan: 1, colSpan: 1 },
+    visibility: true,
+  };
+
+  constructor(
+    private reactiveFormBuilder: FormBuilder,
+    private readonly modalService: BsModalService
+  ) {}
+
+  ngOnInit(): void {
+    // this.ids = FormBuilderTableSectionUtils.defaultIds(this.sectionIndex);
+
+    this.tableViewSpecs = data.tableViewSpecs as any;
+    this.initialRowsNumber = this.tableViewSpecs.numberOfRows;
+    this.initialColumnsNumber = this.tableViewSpecs.numberOfColumns;
+
+    console.log('tableViewSpecs', this.tableViewSpecs);
+    if (
+      !this.tableInit &&
+      this.tableViewSpecs.numberOfRows > 0 &&
+      this.tableViewSpecs.numberOfColumns > 0
+      // &&
+      // this.sectionFieldListFormArray.length > 0
+    ) {
+      this.initializeTable(true).then(() => {});
+    }
+  }
+
+  async initializeTable(onFirstLoad = false) {
+    if (
+      !this.tableViewSpecs.numberOfRows ||
+      !this.tableViewSpecs.numberOfColumns
+    ) {
+      return alert('Number of rows and columns must be min 1');
+    }
+
+    // store initial value before generate table function
+    this.initialRowsNumber = this.tableViewSpecs.numberOfRows;
+    this.initialColumnsNumber = this.tableViewSpecs.numberOfColumns;
+
+    if (
+      !onFirstLoad
+      // &&
+      // !FormBuilderTableSectionUtils.validateTableData(
+      //   this.tableData,
+      //   this.authoredForm,
+      //   this.sectionIndex
+      // )
+    ) {
+      this.generateInitializeTable();
+      this.updateTableDataAndTableViewSpecsToFormGroup();
+    } else {
+      this.generateTable();
+      this.updateTableDataAndTableViewSpecsToFormGroup();
+    }
+
+    // deep copy the initial table Data
+    this.initializeTableData = JSON.stringify(this.tableData);
+    this.tableInit = true;
+  }
+  /**
+   * Re-initialize table to begining
+   */
+  reInitializeTable() {
+    this.tableInit = false;
+  }
+
+  replaceFormArrayValues(newValues: any[], formArray: FormArray) {
+    // clear existing controls
+    formArray.clear();
+
+    // add new controls and set new value
+    newValues.forEach((value) => {
+      formArray.push(new FormControl(value));
+    });
+  }
+
+  /**
+   *  this generate table viewspecs will always call in updateTableDataAndTableViewSpecsToFormGroup
+   *  cause this updateTableDataAndTableViewSpecsToFormGroup will execute in every
+   *  action functions
+   * */
+  generateTableViewSpecs() {
+    const visible = FormBuilderTableSectionUtils.flattenArrayAs(
+      'visibility',
+      this.tableData
+    );
+    const numberOfColumns = this.tableData[0].length;
+    const numberOfRows = this.tableData.length;
+    const columnWidth = 100 / numberOfColumns;
+
+    return {
+      numberOfRows,
+      numberOfColumns,
+      colWidths: Array(numberOfColumns).fill(`${columnWidth}%`),
+      rowHeights: Array(numberOfRows).fill(`0px`),
+      rowSpan: FormBuilderTableSectionUtils.flattenArrayAs(
+        'rowSpan',
+        this.tableData
+      ),
+      colSpan: FormBuilderTableSectionUtils.flattenArrayAs(
+        'colSpan',
+        this.tableData
+      ),
+      visible,
+    };
+  }
+
+  /**
+   * This function convert old format into matrix format that
+   * @returns array of array shape
+   */
   generateTable() {
+    // reset initialisizing table data
+    this.tableData = [];
     const parent: any = {};
-    const rowsNumber = this.tableViewSpecs.tableViewSpecs.numberOfRows;
-    const columnsNumber = this.tableViewSpecs.tableViewSpecs.numberOfColumns;
 
-    for (let i = 0; i < rowsNumber; i++) {
-      for (let j = 0; j < columnsNumber; j++) {
-        parent[`${i}:${j}`] = { cellIndex: i * columnsNumber + j };
+    const fields = this.defaultCell;
+    const { rowSpan, colSpan, visible } = this.tableViewSpecs;
+
+    for (let i = 0; i < this.tableViewSpecs.numberOfRows; i++) {
+      for (let j = 0; j < this.tableViewSpecs.numberOfColumns; j++) {
+        parent[`${i}:${j}`] = {
+          cellIndex: i * this.tableViewSpecs.numberOfColumns + j,
+        };
       }
     }
 
@@ -76,19 +213,12 @@ export class AppComponent {
 
       parent[keys] = {
         ...parent[keys],
-        cell: this.tableViewSpecs.fields[parent[keys].cellIndex],
+        cell: fields[parent[keys].cellIndex],
         spanInfo: {
-          rowSpan:
-            this.tableViewSpecs.tableViewSpecs.rowSpan[
-              parent[keys].cellIndex
-            ] || 1,
-          colSpan:
-            this.tableViewSpecs.tableViewSpecs.colSpan[
-              parent[keys].cellIndex
-            ] || 1,
+          rowSpan: rowSpan[parent[keys].cellIndex] || 1,
+          colSpan: colSpan[parent[keys].cellIndex] || 1,
         },
-        visibility:
-          this.tableViewSpecs.tableViewSpecs.visible[parent[keys].cellIndex],
+        visibility: visible[parent[keys].cellIndex],
       };
     }
 
@@ -101,24 +231,109 @@ export class AppComponent {
         this.tableData[row] = [];
       }
 
-      this.tableData[row][col] = value;
+      this.tableData[row][col] = value as Cell;
     });
 
+    // reset range value
+    this.resetSelectedRange();
     return parent;
   }
 
-  getSpan(field: any) {
-    return { row: field.spanInfo.rowSpan, col: field.spanInfo.colSpan };
+  /**
+   * @Note
+   * This generateInitializeTable function looks similiar with generateTable,
+   * the different just on the assignee value, it cant be put together,
+   * to avoid any confusion and it can effect the shape of the matrix
+   */
+  generateInitializeTable() {
+    this.tableData = [];
+    const parent: any = {};
+
+    for (let i = 0; i < this.tableViewSpecs.numberOfRows; i++) {
+      for (let j = 0; j < this.tableViewSpecs.numberOfColumns; j++) {
+        parent[`${i}:${j}`] = {
+          cellIndex: i * this.tableViewSpecs.numberOfColumns + j,
+        };
+      }
+    }
+
+    for (let p = 0; p < Object.keys(parent).length; p++) {
+      const keys = Object.keys(parent)[p];
+      parent[keys] = {
+        ...this.defaultCell,
+        cellIndex: parent[keys].cellIndex,
+      };
+    }
+
+    const result = Object.entries(parent);
+
+    result.forEach(([key, value]) => {
+      const [row, col] = key.split(':').map(Number);
+
+      if (!this.tableData[row]) {
+        this.tableData[row] = [];
+      }
+
+      this.tableData[row][col] = value as Cell;
+    });
+
+    this.resetSelectedRange();
+    return parent;
   }
 
-  rowSpan_tablec_spec_colSpan: any = [];
+  /**
+   *  this updateTableDataAndTableViewSpecsToFormGroup function is
+   *  to update table data matrix to form array and table view specs to it object,
+   *  the result will use as payload data
+   */
+  updateTableDataAndTableViewSpecsToFormGroup() {
+    const newTableViewSpecs = this.generateTableViewSpecs();
+
+    const flattenedCell = FormBuilderTableSectionUtils.flattenArrayAs(
+      'cell',
+      this.tableData
+    );
+
+    // this.sectionFormGroup.get('tableViewSpecs')?.patchValue(newTableViewSpecs);
+
+    // this.replaceFormArrayValues(flattenedCell, this.sectionFieldListFormArray);
+    this.resetSelectedRange();
+  }
+
+  onReset() {
+    this.tableData = JSON.parse(this.initializeTableData);
+    this.updateTableDataAndTableViewSpecsToFormGroup();
+
+    // if (
+    //   FormBuilderTableSectionUtils.validateTableData(
+    //     JSON.parse(this.initializeTableData),
+    //     // this.authoredForm,
+    //     // this.sectionIndex
+    //   )
+    // ) {
+    //   this.generateTable();
+    // } else {
+    this.generateInitializeTable();
+    // }
+  }
+
+  resetSelectedRange() {
+    this.selectedRange = this.defaultSelectedRangeValue;
+  }
+
+  confirmDeleteSection(): void {
+    // const parent = this.sectionFormGroup.parent as FormArray;
+    // this.deleteSectionEvent.emit(this.sectionIndex);
+    // parent.removeAt(this.sectionIndex);
+  }
+
+  onMouseLeave() {
+    if (this.mouseDown) this.mouseDown = false;
+  }
+
   startSelecting(rowIndex: number, colIndex: number) {
     this.mouseDown = true;
 
-    const { rowSpan, colSpan } = this.tableData[rowIndex][colIndex].spanInfo;
-    this.rowSpan_tablec_spec_colSpan = [rowSpan, colSpan];
-
-    this.startRange = { rowIndex, colIndex };
     this.selectedRange = {
       startRow: rowIndex,
       startCol: colIndex,
@@ -127,292 +342,166 @@ export class AppComponent {
     };
   }
 
-  endRangeTest = {};
-
-  endSelecting(rowIndex: number, colIndex: number) {
-    this.mouseDown = false;
-
-    const isVerticalSelection = this.selectedRange.startCol === colIndex;
-    const isHorizontalSelection = this.selectedRange.startRow === rowIndex;
-
-    const startCellHasSpanned =
-      this.tableData[this.selectedRange.startRow][this.selectedRange.startCol]
-        ?.spanInfo;
-
-    const cell =
-      this.tableData[this.selectedRange.startRow][this.selectedRange.startCol];
-
-    // console.log('isVerticalSelection', [
-    //   isVerticalSelection,
-    //   isHorizontalSelection,
-    // ]);
-    if (isVerticalSelection && !isHorizontalSelection) {
-      console.log('1');
-      if (startCellHasSpanned.colSpan > 1) {
-        console.log('2');
-        this.selectedRange.endRow = rowIndex;
-        this.selectedRange.endCol = startCellHasSpanned.colSpan;
-      } else if (startCellHasSpanned.rowSpan > 1) {
-        console.log('3', startCellHasSpanned);
-        // this.selectedRange.endCol = colIndex;
-        this.selectedRange.endRow = startCellHasSpanned.rowSpan;
-      }
-    } else if (isHorizontalSelection && !isVerticalSelection) {
-      console.log('4', startCellHasSpanned);
-      if (startCellHasSpanned.rowSpan > 1) {
-        console.log('5');
-        // this.selectedRange.endRow = startCellHasSpanned.rowSpan - 1;
-        this.selectedRange.endCol = startCellHasSpanned.rowSpan;
-      } else if (startCellHasSpanned.colSpan > 1) {
-        console.log('6');
-        // this.selectedRange.endRow = startCellHasSpanned.colSpan - 1;
-        this.selectedRange.endCol = startCellHasSpanned.colSpan;
-      } else if (
-        !cell.visibility &&
-        this.selectedRange.startCol !== this.selectedRange.endCol
-      ) {
-        console.log('7');
-        // in this condition it prevent weird selection to normal selection
-        for (let row = 0; row <= this.selectedRange.endRow; row++) {
-          for (
-            let col = this.selectedRange.startCol;
-            col === this.selectedRange.startCol;
-            col++
-          ) {
-            const eachCell = this.tableData[row][col];
-            if (!eachCell.visibility) {
-              continue;
-            } else {
-              this.selectedRange.startRow = row;
-            }
-          }
-        }
-      }
-    } else if (isVerticalSelection && isHorizontalSelection) {
-      // const rowNeighborStart = this.findNeighbor(rowIndex, colIndex, true);
-      console.log('8', startCellHasSpanned);
-      // console.log('rowNeighborStart', rowNeighborStart);
-    }
-  }
-
   rangeUpdate(
     startRow: number,
     startCol: number,
     endRow: number,
     endCol: number
   ) {
-    // Initial boundaries of the selection range
     let startRowUpdate = Math.min(startRow, endRow);
     let startColUpdate = Math.min(startCol, endCol);
     let endRowUpdate = Math.max(startRow, endRow);
     let endColUpdate = Math.max(startCol, endCol);
 
-    const maxRow = this.tableViewSpecs.tableViewSpecs.numberOfRows - 1;
-    const maxCol = this.tableViewSpecs.tableViewSpecs.numberOfColumns - 1;
+    const maxRow = this.tableData.length - 1;
+    const maxCol = this.tableData[0].length - 1;
 
-    const isEdgeToEgeRow = startRowUpdate === 0 && endRowUpdate === maxRow;
-    const isEdgeToEdgeCol = startColUpdate === 0 && endColUpdate === maxCol;
-
-    if (isEdgeToEgeRow && isEdgeToEdgeCol) {
+    // handle edge-to-edge selection
+    if (
+      startRowUpdate === 0 &&
+      endRowUpdate === maxRow &&
+      startColUpdate === 0 &&
+      endColUpdate === maxCol
+    ) {
       this.selectedRange = {
-        startRow: startRowUpdate,
-        startCol: startColUpdate,
+        startRow: 0,
+        startCol: 0,
         endRow: maxRow,
         endCol: maxCol,
       };
       return;
     }
 
-    let accrossGroup: any = {
+    // expand the corners of the selection
+    const topLeft = TableCellUtils.expandMergedCell(
       startRowUpdate,
       startColUpdate,
-    };
+      this.tableData
+    );
+    const bottomRight = TableCellUtils.expandMergedCell(
+      endRowUpdate,
+      endColUpdate,
+      this.tableData
+    );
 
-    // for (let row = startRowUpdate; row <= endRowUpdate; row++) {
-    //   for (let col = startColUpdate; col <= endColUpdate; col++) {
-    //     const cell = this.tableData[row][col];
-    //     console.log('cell_2', cell);
-    //     const { rowSpan, colSpan } = cell.spanInfo;
-    //     if (rowSpan > 1) {
-    //       console.log('range_3');
+    startRowUpdate = Math.min(startRowUpdate, topLeft.startRow);
+    startColUpdate = Math.min(startColUpdate, topLeft.startCol);
+    endRowUpdate = Math.max(endRowUpdate, bottomRight.endRow);
+    endColUpdate = Math.max(endColUpdate, bottomRight.endCol);
 
-    //       endRowUpdate = Math.max(endRowUpdate, row + rowSpan - 1);
-    //       accrossGroup = { ...accrossGroup, endRowUpdate };
-    //     }
-    //     if (colSpan > 1) {
-    //       endColUpdate = Math.max(endColUpdate, col + colSpan - 1);
-    //       accrossGroup = { ...accrossGroup, endColUpdate };
-    //     }
-    //   }
-    // }
-
-    console.log('accrossGroup', accrossGroup);
-    // Track visited cells to prevent reprocessing
-    const visited = new Set<string>();
-
-    const expandSelection = (row: number, col: number) => {
-      if (visited.has(`${row},${col}`)) return;
-      visited.add(`${row},${col}`);
-
-      const cell = this.tableData[row]?.[col];
-      if (!cell) return;
-
-      const { rowSpan, colSpan } = cell.spanInfo;
-
-      // Expand the selection range based on rowSpan and colSpan
-      const newEndRow = row + rowSpan - 1;
-      const newEndCol = col + colSpan - 1;
-
-      const rows: any[] = [];
-      const cols: any[] = [];
-
-      if (newEndRow > endRowUpdate) endRowUpdate = newEndRow;
-      if (newEndCol > endColUpdate) endColUpdate = newEndCol;
-      let counter = 0;
-
-      // Recursively expand for adjacent cells within the expanded range
-      for (let r = startRowUpdate; r <= endRowUpdate; r++) {
-        for (let c = startColUpdate; c <= endColUpdate; c++) {
-          if (!visited.has(`${r},${c}`)) {
-            if (this.tableData[r]?.[c]?.visibility) {
-              console.log('expandSelection', [r, c]);
-              expandSelection(r, c);
-              ++counter;
-            } else {
-              const directions = [
-                { rowOffset: -1, colOffset: 0, position: 'top' }, // top
-                { rowOffset: 1, colOffset: 0, position: 'bottom' }, // bottom
-                { rowOffset: 0, colOffset: -1, position: 'left' }, // left
-                { rowOffset: 0, colOffset: 1, position: 'right' }, // right
-              ];
-
-              if (this.isCellSelected(r, c)) {
-                if (!this.tableData[r]?.[c].visibility) {
-                  directions.forEach(({ rowOffset, colOffset, position }) => {
-                    let rowOffsetIdx = r + rowOffset;
-                    let colOffsetIdx = c + colOffset;
-
-                    let maxAttempts = 20;
-                    while (
-                      rowOffsetIdx >= 0 &&
-                      rowOffsetIdx <
-                        this.tableViewSpecs.tableViewSpecs.numberOfRows &&
-                      colOffsetIdx >= 0 &&
-                      colOffsetIdx <
-                        this.tableViewSpecs.tableViewSpecs.numberOfColumns &&
-                      maxAttempts > 0
-                    ) {
-                      const offsetCell =
-                        this.tableData[rowOffsetIdx][colOffsetIdx];
-
-                      const { rowSpan: rowSpanOffset, colSpan: colSpanOffset } =
-                        offsetCell.spanInfo;
-
-                      console.log(
-                        `offsetCell__${position}_${rowOffsetIdx},${colOffsetIdx}`,
-                        offsetCell
-                      );
-                      if (
-                        offsetCell.visibility &&
-                        !this.isCellSelected(rowOffsetIdx, colOffsetIdx)
-                      ) {
-                        cols.push(...cols, colOffsetIdx);
-                        rows.push(...rows, rowOffsetIdx);
-
-                        break;
-                      }
-
-                      rowOffsetIdx += rowOffset * rowSpanOffset;
-                      colOffsetIdx += colOffset * colSpanOffset;
-                      maxAttempts--;
-                    }
-                  });
-                }
-              }
-            }
-          }
-        }
-      }
-      return { rows, cols };
-    };
-    const startRowOffset: Set<any> = new Set();
-    const startColOffset: Set<any> = new Set();
-
+    // check for any merged cells within the selection that extend outside the current range
     for (let row = startRowUpdate; row <= endRowUpdate; row++) {
       for (let col = startColUpdate; col <= endColUpdate; col++) {
-        console.log('expandSelection', [row, col]);
-        const cell = this.tableData[row][col];
-
-        const { rowSpan, colSpan } = cell.spanInfo;
-        const expanded: any = expandSelection(row, col);
-
-        const hasExpandedRow = expanded?.rows?.length > 0;
-        const hasExpandedCol = expanded?.cols?.length > 0;
-
-        if (expanded && (hasExpandedRow || hasExpandedCol)) {
-          if (hasExpandedRow) {
-            expanded.rows.forEach((row: any) => startRowOffset.add(row));
-          }
-
-          if (colSpan > 1) {
-            if (hasExpandedCol) {
-              expanded.cols.forEach((col: any) => startColOffset.add(col));
-            }
-          }
-        } else {
-          if (rowSpan > 1) {
-            console.log('range_3');
-            endRowUpdate = Math.max(endRowUpdate, row + rowSpan - 1);
-          }
-          if (colSpan > 1) {
-            console.log('range_4');
-            endColUpdate = Math.max(endColUpdate, col + colSpan - 1);
-          }
-        }
+        const expanded = TableCellUtils.expandMergedCell(
+          row,
+          col,
+          this.tableData
+        );
+        startRowUpdate = Math.min(startRowUpdate, expanded.startRow);
+        startColUpdate = Math.min(startColUpdate, expanded.startCol);
+        endRowUpdate = Math.max(endRowUpdate, expanded.endRow);
+        endColUpdate = Math.max(endColUpdate, expanded.endCol);
       }
     }
 
-    const uniqueRows = Array.from(startRowOffset);
-    const uniqueCols = Array.from(startColOffset);
-
-    if (uniqueRows.length > 1) {
-      startRowUpdate = Math.min(...uniqueRows);
-      endRowUpdate = Math.max(...uniqueRows);
-    }
-
-    if (uniqueCols.length > 1) {
-      startColUpdate = Math.min(...uniqueCols);
-      endRowUpdate = Math.max(...uniqueCols);
-    } else if (uniqueCols.length === 1) {
-      startColUpdate = uniqueCols[0];
-    }
-
-    // Update the selection range with the expanded boundaries
+    // update the selection range
     this.selectedRange = {
       startRow: startRowUpdate,
       startCol: startColUpdate,
       endRow: endRowUpdate,
       endCol: endColUpdate,
     };
+
+    // this.scrollYAxisIfNeeded(startRowUpdate, endRowUpdate);
   }
 
-  flattenArray(arr: any) {
-    let result: any = [];
-    for (let i = 0; i < arr.length; i++) {
-      result.push(...arr[i]);
-    }
-    return result;
-  }
-
+  /**
+   * Update seleted cell
+   * @param rowIndex
+   * @param colIndex
+   */
   updateSelection(rowIndex: number, colIndex: number) {
     if (this.mouseDown) {
-      this.selectedRange.endRow = rowIndex;
-      this.selectedRange.endCol = colIndex;
+      const { startRow, startCol } = this.selectedRange;
 
-      const { startRow, startCol, endRow, endCol } = this.selectedRange;
-
-      this.rangeUpdate(startRow, startCol, endRow, endCol);
+      this.rangeUpdate(startRow, startCol, rowIndex, colIndex);
     }
+  }
+
+  /**
+   * Update and validate the selection move from update range
+   * @param rowIndex
+   * @param colIndex
+   */
+  endSelecting() {
+    this.mouseDown = false;
+  }
+
+  // scrollYAxisIfNeeded(startRowIndex: number, endRowIndex: number) {
+  //   const containerRect =
+  //     this.tableContainer.nativeElement.getBoundingClientRect();
+  //   const rowRect = this.tableBody.nativeElement.getBoundingClientRect();
+  //   const rows = this.tableBody.nativeElement.rows;
+  //   const startRowRect = rows[startRowIndex].getBoundingClientRect();
+  //   const endRowRect = rows[endRowIndex].getBoundingClientRect();
+  //   const bottomArea = endRowRect.bottom - startRowRect.bottom;
+
+  //   const scrollThreshold = 100;
+  //   const scrollStep = 30;
+
+  //   const scrollDownCondition =
+  //     bottomArea > 100 &&
+  //     endRowRect.bottom > containerRect.bottom - scrollThreshold;
+  //   const scrollUpCondition =
+  //     endRowRect.top < containerRect.top + scrollThreshold;
+
+  //   const maxRowSpan = Math.max(
+  //     ...this.tableData[0].map((row: any) => row.spanInfo.rowSpan)
+  //   );
+  //   const totalRows = this.tableData.length;
+
+  //   if (
+  //     (startRowIndex === 0 && endRowIndex === 0) ||
+  //     endRowIndex === totalRows
+  //   ) {
+  //     this.endSelecting();
+  //     return;
+  //   }
+  //   const scrollDownSpeed: number = 800;
+  //   const scrollUpSpeed: number = 100;
+  //   if (scrollDownCondition && endRowIndex > 1) {
+  //     const scrollInterval = setInterval(() => {
+  //       if (this.mouseDown) {
+  //         this.tableContainer.nativeElement.scrollTop += scrollStep;
+  //       } else {
+  //         clearInterval(scrollInterval);
+  //       }
+  //     }, scrollDownSpeed);
+  //   }
+
+  //   if (scrollUpCondition && endRowIndex > 1) {
+  //     const scrollInterval = setInterval(() => {
+  //       if (this.mouseDown) {
+  //         this.tableContainer.nativeElement.scrollTop -= scrollStep;
+  //       } else {
+  //         clearInterval(scrollInterval);
+  //       }
+  //     }, scrollUpSpeed);
+  //   }
+  // }
+
+  getSpan(field: any) {
+    return { row: field.spanInfo.rowSpan, col: field.spanInfo.colSpan };
+  }
+
+  getColumnHeaders(): string[] {
+    const numberOfColumns = this.tableData[0]?.length || 0;
+
+    const columns = [];
+    for (let i = 0; i < numberOfColumns; i++) {
+      columns.push(FormBuilderTableSectionUtils.numberToColumnLetter(i));
+    }
+    return columns;
   }
 
   isCellSelected(rowIndex: number, colIndex: number) {
@@ -428,48 +517,48 @@ export class AppComponent {
     );
   }
 
-  kesini: any = [];
-
-  updateCellToMerge(
-    startRow: number,
-    endRow: number,
-    startCol: number,
-    endCol: number
-  ) {
-    for (let row = startRow; row <= endRow; row++) {
-      for (let col = startCol; col <= endCol; col++) {
-        const cell = this.tableData[row][col];
-
-        if (row !== startRow || col !== startCol) {
-          this.tableData[row][col] = {
-            ...this.tableData[row][col],
-            visibility: false,
-          };
-        } else {
-          const spanInfo = {
-            rowSpan: endRow - startRow + 1,
-            colSpan: endCol - startCol + 1,
-          };
-
-          this.tableData[row][col] = {
-            ...this.tableData[row][col],
-            spanInfo,
-          };
-        }
-      }
-    }
+  dismissModal() {
+    this.modalRef && this.modalRef.hide();
   }
 
-  isContentEditable(): boolean {
-    const { startRow, endRow, startCol, endCol } = this.selectedRange;
+  insertColumn(colIndexToInsert: number) {
+    TableColumnUtils.insertColumnByIndex(
+      colIndexToInsert,
+      this.tableData,
+      this.defaultCell
+    );
 
-    let isEditable = false;
+    this.updateTableDataAndTableViewSpecsToFormGroup();
+  }
 
-    if (startRow === endRow && startCol === endCol) {
-      isEditable = true;
-    }
+  duplicateColumn(colIndexToDuplicate: number) {
+    TableColumnUtils.duplicateSingleColumn(colIndexToDuplicate, this.tableData);
+    this.updateTableDataAndTableViewSpecsToFormGroup();
+  }
 
-    return isEditable;
+  insertRow(rowIndexToInsert: number) {
+    TableRowUtils.insertRowByIndex(rowIndexToInsert, this.tableData);
+    this.updateTableDataAndTableViewSpecsToFormGroup();
+  }
+
+  duplicateRow(rowIndexToDuplicate: number) {
+    TableRowUtils.duplicateRowByIndex(rowIndexToDuplicate, this.tableData);
+    this.updateTableDataAndTableViewSpecsToFormGroup();
+  }
+
+  showDeleteRowModal(rowIndex: number) {
+    this.modalRef = this.modalService.show(
+      this.deleteRowModalTemplate,
+      MODAL_OPTIONS_SM
+    );
+  }
+
+  showDeleteColumnModal(colIndex: number) {
+    this.colIndexToDelete = colIndex;
+    this.modalRef = this.modalService.show(
+      this.deleteColumnModalTemplate,
+      MODAL_OPTIONS_SM
+    );
   }
 
   mergeCells() {
@@ -481,44 +570,112 @@ export class AppComponent {
     }
 
     const { startRow, endRow, startCol, endCol } = this.selectedRange;
-
     const startRowRange = Math.min(startRow, endRow);
     const endRowRange = Math.max(startRow, endRow);
     const startColRange = Math.min(startCol, endCol);
     const endColRange = Math.max(startCol, endCol);
 
-    this.updateCellToMerge(
-      startRowRange,
-      endRowRange,
-      startColRange,
-      endColRange
+    // filtere span has span row / col
+    const filteredSpanCell = TableCellUtils.getCellVisibility(
+      this.selectedRange,
+      this.tableData
+    ).filter((f) => f.spanInfo.rowSpan > 1 || f.spanInfo.colSpan > 1);
+
+    // filtered cell that has visibility = true and its not the spanned row \ col
+    const filteredCell = TableCellUtils.getCellVisibility(
+      this.selectedRange,
+      this.tableData
+    ).filter((f) => !(f.spanInfo.rowSpan > 1 || f.spanInfo.colSpan > 1));
+
+    if (filteredSpanCell.length > 0 && filteredCell.length === 0) {
+      return;
+    } else {
+      const existingValues = TableCellUtils.checkExistingValues(
+        startRowRange,
+        endRowRange,
+        startColRange,
+        endColRange,
+        this.tableData
+      );
+
+      if (existingValues.length > 0) {
+        this.showActionModal(existingValues);
+        this.selectedMergeRange = {
+          startRowRange,
+          endRowRange,
+          startColRange,
+          endColRange,
+        };
+      } else {
+        TableCellUtils.performMerge(
+          startRowRange,
+          endRowRange,
+          startColRange,
+          endColRange,
+          this.tableData
+        );
+        this.updateTableDataAndTableViewSpecsToFormGroup();
+      }
+    }
+  }
+
+  openCellFieldModal() {
+    // this.tableSectionFieldComponent.openCellFieldModal();
+  }
+
+  showActionModal(existingValues: string[]) {
+    this.modalMessage = `The following cells contain values that will be overwritten:\n${existingValues.join(
+      '\n'
+    )}\n\nDo you want to proceed with the merge?`;
+
+    this.modalRef = this.modalService.show(
+      this.mergeModalTemplate,
+      MODAL_OPTIONS_SM
     );
   }
 
-  undoMergeCells() {
+  undoMergeCells(rangeProperties?: any) {
+    const hasRangeProperties =
+      rangeProperties && Object.keys(rangeProperties).length > 0;
     if (
+      !hasRangeProperties &&
       this.selectedRange.startRow === -1 &&
       this.selectedRange.endRow === -1
     ) {
       return;
     }
 
-    const { startRow, endRow, startCol, endCol } = this.selectedRange;
     const spanInfo = {
       rowSpan: 1,
       colSpan: 1,
     };
-    const currentCell = this.tableData[startRow][startCol];
-    const hasSppannedInCurrentSingleSelectedArea =
-      (currentCell.spanInfo.rowSpan || currentCell.spanInfo.colSpan) &&
-      [startRow, endRow, startCol, endCol].every(
-        (i) => i === startRow && i === startCol
-      );
 
-    const startRowMin = Math.min(startRow, endRow);
-    const startColMin = Math.min(startCol, endCol);
-    const endRowsMax = Math.max(startRow, endRow);
-    const endColMax = Math.max(startCol, endCol);
+    let currentCell;
+
+    let startRowMin;
+    let startColMin;
+    let endRowsMax;
+    let endColMax;
+
+    if (hasRangeProperties) {
+      const { startRow, endRow, startCol, endCol } = rangeProperties;
+
+      currentCell = this.tableData[startRow][startCol];
+
+      startRowMin = Math.min(startRow, endRow);
+      startColMin = Math.min(startCol, endCol);
+      endRowsMax = Math.max(startRow, endRow);
+      endColMax = Math.max(startCol, endCol);
+    } else {
+      const { startRow, endRow, startCol, endCol } = this.selectedRange;
+
+      currentCell = this.tableData[startRow][startCol];
+
+      startRowMin = Math.min(startRow, endRow);
+      startColMin = Math.min(startCol, endCol);
+      endRowsMax = Math.max(startRow, endRow);
+      endColMax = Math.max(startCol, endCol);
+    }
 
     for (
       let r = startRowMin;
@@ -532,9 +689,9 @@ export class AppComponent {
       ) {
         if (
           r >= 0 &&
-          r < this.tableViewSpecs.tableViewSpecs.numberOfRows &&
+          r < this.tableData.length &&
           c >= 0 &&
-          c < this.tableViewSpecs.tableViewSpecs.numberOfColumns
+          c < this.tableData[0].length
         ) {
           const cell = this.tableData[r][c];
 
@@ -547,116 +704,135 @@ export class AppComponent {
       }
     }
 
-    this.cdr.detectChanges();
+    // regenerate table view specs
+    this.updateTableDataAndTableViewSpecsToFormGroup();
   }
 
-  onmouseleave() {
-    if (this.mouseDown) this.mouseDown = false;
-  }
-
-  getColumnHeaders(): string[] {
-    const numberOfColumns = this.tableViewSpecs.tableViewSpecs.numberOfColumns;
-    const columns = [];
-    for (let i = 0; i < numberOfColumns; i++) {
-      columns.push(this.numberToColumnLetter(i));
+  confirmDeleteRow() {
+    if (this.tableData.length > 0) {
+      TableRowUtils.deleteRowByIndex(
+        this.rowIndexToDelete,
+        this.tableData,
+        (e) => this.undoMergeCells(e)
+      );
+      this.updateTableDataAndTableViewSpecsToFormGroup();
+    } else {
+      alert('The table must have at least one row. Deletion is not allowed.');
     }
-    return columns;
+    this.dismissModal();
+    this.resetSelectedRange();
   }
 
-  numberToColumnLetter(index: number): string {
-    let letter = '';
-    while (index >= 0) {
-      letter = String.fromCharCode((index % 26) + 65) + letter;
-      index = Math.floor(index / 26) - 1;
+  confirmMergeModal() {
+    const { startRowRange, endRowRange, startColRange, endColRange } =
+      this.selectedMergeRange;
+
+    TableCellUtils.performMerge(
+      startRowRange,
+      endRowRange,
+      startColRange,
+      endColRange,
+      this.tableData
+    );
+    this.updateTableDataAndTableViewSpecsToFormGroup();
+
+    this.dismissModal();
+  }
+
+  // getTableSectionField(rowIndex: number, colIndex: number) {
+  //   return FormBuilderUtils.createTableSectionFieldFormGroup(
+  //     this.tableData[rowIndex][colIndex].cell,
+  //     this.reactiveFormBuilder,
+  //     this.formTypeSpecs
+  //   );
+  // }
+
+  getCellType(rowIndex: number, colIndex: number): string {
+    return this.tableData[rowIndex][colIndex]?.cell?.type;
+  }
+
+  getCellLabel(rowIndex: number, colIndex: number): string {
+    return this.tableData[rowIndex][colIndex]?.cell?.name;
+  }
+
+  confirmDeleteColumn() {
+    if (this.tableData[0].length <= 1) {
+      alert(
+        'The table must have at least one column. Deletion is not allowed.'
+      );
+
+      return;
     }
-    return letter;
+
+    TableColumnUtils.deleteColumnByIndex(this.colIndexToDelete, this.tableData);
+    this.updateTableDataAndTableViewSpecsToFormGroup();
+    this.resetSelectedRange();
+    this.dismissModal();
   }
 
-  updateCellContent(event: any, row: any, cellIndex: number) {
-    row.cells[cellIndex].content = event.target.innerText;
+  showPopUpBar(): boolean {
+    const keys = Object.keys(this.selectedRange);
+
+    return keys.every((key) => this.selectedRange[key] !== -1);
   }
 
-  showRowActionButton(rowIndex: number): any {
-    for (let r = rowIndex; r >= 0; r--) {
-      for (let c = 0; c < this.tableData[r].length; c++) {
-        const cell = this.tableData[r][c];
+  // openCellFieldModal() {
+  //   this.tableSectionFieldComponent.openCellFieldModal();
+  // }
 
-        if (cell.spanInfo.rowSpan > 1) {
-          if (r + cell.spanInfo.rowSpan - 1 === rowIndex) {
-            return true;
-          }
+  checkSelectedCopiedPosition(by?: string) {
+    let passed = false;
 
-          if (r + cell.spanInfo.rowSpan - 1 > rowIndex) {
-            return false;
-          }
-        }
-      }
+    if (by === 'paste') {
+      passed = Object.keys(this.selectedFieldToCopy.value).length === 0;
+    } else {
+      passed = true;
     }
 
-    return true;
+    return passed;
   }
 
-  deleteRows(rowIndexToDelete: number) {
-    const colChanges: number[] = [];
-    for (
-      let r = rowIndexToDelete;
-      r >= this.tableData.length - rowIndexToDelete;
-      r--
+  copyCell(rowIndex: number, colIndex: number) {
+    const fieldToCopied = this.tableData[rowIndex][colIndex].cell as any;
+
+    FormBuilderTableSectionUtils.resetFieldId(fieldToCopied);
+
+    if (FormBuilderTableSectionUtils.validateByFieldType(fieldToCopied)) {
+      this.selectedFieldToCopy = {
+        status: true,
+        value: fieldToCopied,
+        copiedFrom: { row: rowIndex, col: colIndex },
+      };
+    } else {
+      alert("Nothing to copy! Please ensure there's something to duplicate.");
+
+      // reset selection field
+      this.selectedFieldToCopy = {
+        status: false,
+        value: {},
+      };
+    }
+  }
+
+  pasteCell(rowIndex: number, colIndex: number) {
+    if (
+      this.selectedFieldToCopy.copiedFrom.row !== rowIndex ||
+      this.selectedFieldToCopy.copiedFrom.col !== colIndex
     ) {
-      if (r !== rowIndexToDelete) {
-        for (let c = 0; c < this.tableData[r].length; c++) {
-          const previousCell = this.tableData[r][c];
+      const fieldToCopyValue = this.selectedFieldToCopy.value;
 
-          if (previousCell.visibility && previousCell.spanInfo.rowSpan > 1) {
-            const { spanInfo } = previousCell;
-            const span = {
-              rowSpan: spanInfo.rowSpan - 1,
-              colSpan: spanInfo.colSpan,
-            };
-
-            this.tableData[r][c] = {
-              ...this.tableData[r][c],
-              spanInfo: span,
-            };
-
-            colChanges.push(c);
-          }
-        }
-      } else {
-        for (let c = 0; c < this.tableData[r].length; c++) {
-          const currentCell = this.tableData[r][c];
-
-          const { visibility } = currentCell;
-
-          if (!visibility && colChanges.some((changes) => changes === c)) {
-            this.tableData[r][c] = {
-              ...this.tableData[r][c],
-              visibility: true,
-            };
-          }
-        }
+      if (Object.keys(fieldToCopyValue).length > 0) {
+        this.tableData[rowIndex][colIndex].cell = fieldToCopyValue;
       }
+      this.updateTableDataAndTableViewSpecsToFormGroup();
     }
-
-    this.tableData.splice(rowIndexToDelete, 1);
   }
 
-  addRow(indexToInsert: number) {
-    const cell = {
-      cell: this.defaultCell,
-      cellIndex: 3,
-      spanInfo: { rowSpan: 1, colSpan: 1 },
-      visibility: true,
-    };
+  updateCellField() {
+    this.updateTableDataAndTableViewSpecsToFormGroup();
+  }
 
-    const populateCell = new Array(
-      this.tableViewSpecs.tableViewSpecs.numberOfColumns
-    ).fill(cell);
-
-    console.log('populateCell', populateCell);
-    this.tableData.splice(indexToInsert + 1, 0, populateCell);
-
-    console.log('this.tableData', this.tableData);
-    // this.generateTableData = this.generateTable(this.tableData.length);
+  getAlphabetIndex(index: number): string {
+    return (index + 10).toString(36).toUpperCase();
   }
 }
